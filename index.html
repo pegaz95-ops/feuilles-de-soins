@@ -313,7 +313,7 @@ h2.sec{font-family:var(--head);font-size:22px;margin:22px 0 4px}
 <script type="module">
 import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, sendPasswordResetEmail, updateProfile, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, doc, setDoc, updateDoc, deleteDoc, getDoc, onSnapshot, query, where, arrayUnion, arrayRemove, deleteField } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, doc, setDoc, updateDoc, deleteDoc, getDoc, getDocFromCache, onSnapshot, query, where, arrayUnion, arrayRemove, deleteField } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 const STATUS = {
   todo:{label:"À envoyer", cls:"todo"}, sent:{label:"Envoyée", cls:"sent"},
@@ -371,10 +371,12 @@ const Store = {
   },
   async deleteFeuille(f){ (f.scans||[]).forEach(sc=>Store.deleteScan(sc)); await write(deleteDoc(fdoc("feuilles",f.id))); },
   async addScan(file){
-    const dataUrl = await compressToLimit(file, 800000);
+    const img = await loadSrc(URL.createObjectURL(file));
+    const dataUrl = fitToLimit(img, 800000);
+    const t = makeThumb(img);
     const id = uid(); scanCache[id] = dataUrl;
     await write(setDoc(fdoc("scans",id), {img:dataUrl, createdAt:new Date().toISOString()}));
-    return {d:id};
+    return {d:id, t};
   },
   deleteScan(sc){ if(sc && sc.d) deleteDoc(fdoc("scans",sc.d)).catch(()=>{}); }
 };
@@ -382,25 +384,48 @@ let scanCache = {};
 async function scanURL(sc){
   if(!sc || !sc.d) return null;
   if(scanCache[sc.d]) return scanCache[sc.d];
-  const s = await getDoc(fdoc("scans",sc.d));
+  let s = null;
+  try{ s = await getDocFromCache(fdoc("scans",sc.d)); }catch(e){}
+  if(!s || !s.exists()) s = await getDoc(fdoc("scans",sc.d));
   const v = s.exists() ? s.data().img : null;
   if(v) scanCache[sc.d]=v;
   return v;
 }
 
 /* ---------- images ---------- */
-function loadImg(file){ return new Promise((res,rej)=>{ const u=URL.createObjectURL(file); const i=new Image(); i.onload=()=>res(i); i.onerror=()=>rej(new Error("image")); i.src=u; }); }
+function loadSrc(src){ return new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=()=>rej(new Error("image")); i.src=src; }); }
 function drawTo(img, max){
   const r=Math.min(1, max/Math.max(img.naturalWidth,img.naturalHeight));
   const c=document.createElement("canvas"); c.width=Math.round(img.naturalWidth*r); c.height=Math.round(img.naturalHeight*r);
   const g=c.getContext("2d"); g.fillStyle="#fff"; g.fillRect(0,0,c.width,c.height); g.drawImage(img,0,0,c.width,c.height); return c;
 }
-async function compressToLimit(file, limit){
-  const img=await loadImg(file);
-  const tries=[[2000,.78],[1800,.72],[1600,.68],[1400,.62],[1200,.58],[1000,.55]];
+/* Photo complète : 1600 px (lisible jusqu'aux petits caractères), compressée au besoin. */
+function fitToLimit(img, limit){
+  const tries=[[1600,.72],[1600,.62],[1400,.6],[1200,.55],[1000,.5]];
   let out="";
   for(const [m,q] of tries){ out=drawTo(img,m).toDataURL("image/jpeg",q); if(out.length<=limit) return out; }
   return out;
+}
+/* Miniature d'environ 10 Ko, rangée dans la feuille : la liste s'affiche sans télécharger les photos. */
+function makeThumb(img){ return drawTo(img,240).toDataURL("image/jpeg",.6); }
+const thumbBusy = new Set();
+async function ensureThumbs(f, all){
+  const idx=(f.scans||[]).map((sc,i)=>i).filter(i=>!f.scans[i].t && (all||i===0));
+  if(!idx.length || thumbBusy.has(f.id)) return;
+  thumbBusy.add(f.id);
+  try{
+    const scans=f.scans.map(x=>Object.assign({},x));
+    for(const i of idx){ const u=await scanURL(scans[i]).catch(()=>null); if(u) scans[i].t=makeThumb(await loadSrc(u)); }
+    if(scans.some((x,i)=>x.t && !f.scans[i].t)) await updateDoc(fdoc("feuilles",f.id), {scans});
+  }catch(e){ console.warn(e); }
+  finally{ thumbBusy.delete(f.id); }
+}
+function openViewer(sc){
+  const img=$("#viewerImg"), hint=$("#viewer .vhint");
+  img.src = sc.t || ""; $("#viewer").classList.remove("zoom"); $("#viewer").hidden=false;
+  hint.textContent="Chargement de la photo…";
+  scanURL(sc).then(u=>{ if(u && !$("#viewer").hidden){ img.src=u; hint.textContent="Touche l'image pour zoomer"; } })
+    .catch(()=>{ hint.textContent="Photo indisponible hors connexion."; });
 }
 
 /* ---------- rendu : feuilles ---------- */
@@ -452,7 +477,8 @@ function renderList(){
     if(st==="todo") when=`Soins du ${fmtDate(f.dateSoins)}`;
     else if(st==="paid") when=`Remboursée le ${fmtDate(f.dateRemb)}`+(f.montantRemb!==""&&f.montantRemb!=null?` · ${money(f.montantRemb)}`:"");
     else when=`Envoyée le ${fmtDate(f.dateEnvoi)} · il y a ${daysSince(f.dateEnvoi)} j`;
-    const th = (f.scans&&f.scans.length) ? `<span class="thumb" data-thumb="${f.id}">…</span>` : `<span class="thumb">Pas de photo</span>`;
+    const s0 = f.scans&&f.scans[0];
+    const th = s0 ? (s0.t ? `<span class="thumb" style="background-image:url('${s0.t}')"></span>` : `<span class="thumb">…</span>`) : `<span class="thumb">Pas de photo</span>`;
     return `<button class="card s-${S2.cls}" data-open="${f.id}">
       ${th}
       <span><h3>${esc(shortName(f.beneficiaire))} · ${esc(f.organisme)}</h3>
@@ -462,7 +488,7 @@ function renderList(){
       <span class="stamp ${S2.cls}">${S2.label}</span>
     </button>`;
   }).join("");
-  v.forEach(f=>{ if(f.scans&&f.scans.length){ scanURL(f.scans[0]).then(u=>{ const t=document.querySelector(`[data-thumb="${f.id}"]`); if(t&&u){ t.style.backgroundImage=`url("${u}")`; t.textContent=""; } }).catch(()=>{}); } });
+  v.forEach(f=>{ if(f.scans&&f.scans.length&&!f.scans[0].t) ensureThumbs(f,false); });
 }
 
 /* ---------- rendu : bilan ---------- */
@@ -609,7 +635,7 @@ function renderDetail(stampPop){
   } else act=`<button class="btn ghost block" data-act="undoPaid">Annuler le remboursement</button>`;
   $("#detailBody").innerHTML = `
     <span class="stamp big ${S2.cls} ${stampPop?"pop":""}">${S2.label}</span>
-    <div class="photos" id="detPhotos">${(f.scans||[]).map((sc,i)=>`<button class="ph" data-view="${i}" aria-label="Voir la photo ${i+1}">…</button>`).join("") || `<span class="hint">Aucune photo.</span>`}</div>
+    <div class="photos" id="detPhotos">${(f.scans||[]).map((sc,i)=>`<button class="ph" data-view="${i}" aria-label="Voir la photo ${i+1}" ${sc.t?`style="background-image:url('${sc.t}')"`:""}>${sc.t?"":"Photo "+(i+1)}</button>`).join("") || `<span class="hint">Aucune photo.</span>`}</div>
     <dl class="dl">
       <dt>Bénéficiaire</dt><dd>${esc(f.beneficiaire)}</dd>
       <dt>Organisme</dt><dd>${esc(f.organisme)}</dd>
@@ -619,7 +645,7 @@ function renderDetail(stampPop){
     </dl>
     ${tl}
     <div class="actions">${act}<button class="btn danger block" data-act="delete">Supprimer la feuille</button></div>`;
-  (f.scans||[]).forEach((sc,i)=>{ scanURL(sc).then(u=>{ const b=document.querySelector(`#detPhotos [data-view="${i}"]`); if(b&&u){ b.style.backgroundImage=`url("${u}")`; b.textContent=""; b.dataset.src=u; } }).catch(()=>{}); });
+  if((f.scans||[]).some(sc=>!sc.t)) ensureThumbs(f,true);
 }
 async function detailAction(a){
   const f=S.feuilles.find(x=>x.id===S.openId); if(!f) return;
@@ -657,12 +683,12 @@ function renderFormSegs(){
 }
 function renderFormPhotos(){
   const F=S.form;
-  const ph = F.scans.map((sc,i)=>`<div class="ph" data-fi="${i}">…<button type="button" class="x" data-rm="${i}" aria-label="Retirer la photo">×</button></div>`).join("");
+  const ph = F.scans.map((sc,i)=>`<div class="ph" data-fi="${i}" ${sc.t?`style="background-image:url('${sc.t}')"`:""}>${sc.t?"":"…"}<button type="button" class="x" data-rm="${i}" aria-label="Retirer la photo">×</button></div>`).join("");
   const busy = F._busy ? `<div class="ph">Envoi…</div>` : "";
   $("#formPhotos").innerHTML = ph + busy +
     `<label class="addph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Prendre une photo<input type="file" class="fileov" data-file="cam" accept="image/*" capture="environment" aria-label="Prendre une photo"></label>
      <label class="addph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 16l5-5 4 4 3-3 6 6"/></svg>Depuis la galerie<input type="file" class="fileov" data-file="gal" accept="image/*" multiple aria-label="Choisir dans la galerie"></label>`;
-  F.scans.forEach((sc,i)=>scanURL(sc).then(u=>{ const d=document.querySelector(`#formPhotos [data-fi="${i}"]`); if(d&&u){ d.style.backgroundImage=`url("${u}")`; d.firstChild.textContent=""; } }).catch(()=>{}));
+  F.scans.forEach((sc,i)=>{ if(!sc.t) scanURL(sc).then(async u=>{ if(!u) return; sc.t=makeThumb(await loadSrc(u)); const d=document.querySelector(`#formPhotos [data-fi="${i}"]`); if(d){ d.style.backgroundImage=`url('${sc.t}')`; d.firstChild.textContent=""; } }).catch(()=>{}); });
 }
 async function addFiles(files){
   const F=S.form; if(!F) return;
@@ -981,7 +1007,7 @@ document.addEventListener("click", async e=>{
   if(d.sum){ S.filter.st=d.sum; setTab("liste"); return renderAll(); }
   if(d.open) return openDetail(d.open);
   if(d.act) return detailAction(d.act);
-  if(d.view!=null && d.src){ $("#viewerImg").src=d.src; $("#viewer").classList.remove("zoom"); $("#viewer").hidden=false; return; }
+  if(d.view!=null && S.openId){ const f=S.feuilles.find(x=>x.id===S.openId); const sc=f&&f.scans&&f.scans[Number(d.view)]; if(sc) openViewer(sc); return; }
   if(d.b && S.form){ S.form.beneficiaire=d.b; return renderFormSegs(); }
   if(d.o && S.form){ S.form.organisme=d.o; return renderFormSegs(); }
   if(d.v && S.form){ S.form.statut=d.v; return renderFormSegs(); }
