@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Feuilles de soins – Famille Dubois</title>
+<title>Feuilles de soins</title>
 <meta name="theme-color" content="#1F3A2E">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
@@ -100,7 +100,7 @@ nav.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(-
 .iconbtn svg{width:24px;height:24px}
 
 label.lbl,.lbl{display:block;font-weight:700;font-size:15px;margin:16px 0 6px}
-input[type=text],input[type=number],input[type=date],textarea,select.inp{width:100%;padding:12px;border:1px solid var(--rule);border-radius:8px;background:var(--field);min-height:46px}
+input[type=text],input[type=email],input[type=password],input[type=number],input[type=date],textarea,select.inp{width:100%;padding:12px;border:1px solid var(--rule);border-radius:8px;background:var(--field);min-height:46px}
 textarea{min-height:72px;resize:vertical}
 .seg{display:grid;gap:6px}
 .seg.two{grid-template-columns:1fr 1fr}
@@ -169,6 +169,21 @@ h2.sec{font-family:var(--head);font-size:22px;margin:22px 0 4px}
 .linkbtn{background:none;border:0;color:var(--sent);text-decoration:underline;padding:8px 0;font-size:15px}
 .splash{position:fixed;inset:0;z-index:50;background:var(--paper);display:grid;place-items:center;color:var(--ink-2)}
 .splash[hidden]{display:none}
+
+.plist{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.prow{background:var(--sheet);border:1px solid var(--rule);border-radius:10px;padding:12px}
+.prow .top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.prow .name{font-weight:700;flex:1;min-width:0;overflow-wrap:anywhere}
+.prow .mail{color:var(--ink-2);font-size:14px;overflow-wrap:anywhere}
+.prow .btns{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.sbtn{border:1px solid var(--rule);background:var(--field);border-radius:8px;padding:8px 12px;font-size:14px}
+.sbtn.danger{color:var(--late);border-color:var(--late)}
+.pill{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;border:1.5px solid currentColor;border-radius:4px;padding:1px 6px}
+.pill.own{color:var(--paid)} .pill.adm{color:var(--sent)} .pill.inv{color:var(--todo)}
+.addrow{display:flex;gap:8px;margin-top:8px}
+.addrow input{flex:1;min-width:0}
+.card-box{background:var(--sheet);border:1px solid var(--rule);border-radius:10px;padding:14px;margin-top:8px}
+.note{font-size:14px;color:var(--ink-2);margin-top:8px}
 </style>
 </head>
 <body>
@@ -176,20 +191,27 @@ h2.sec{font-family:var(--head);font-size:22px;margin:22px 0 4px}
 <section class="login" id="login" hidden>
   <div class="box">
     <h1>Feuilles de soins</h1>
-    <p class="sub">Famille Dubois · connexion</p>
+    <p class="sub">Suivi des remboursements CNMSS, CPS…</p>
+    <div class="seg two" style="margin-top:20px">
+      <button type="button" id="modeLogin" aria-pressed="true">Se connecter</button>
+      <button type="button" id="modeSignup" aria-pressed="false">Créer un compte</button>
+    </div>
+    <div id="rowNom" hidden><label class="lbl" for="lgNom">Votre nom</label><input type="text" id="lgNom" autocomplete="name" placeholder="Prénom Nom"></div>
     <label class="lbl" for="lgEmail">Email</label>
-    <input type="text" id="lgEmail" inputmode="email" autocomplete="username" autocapitalize="off" spellcheck="false">
+    <input type="email" id="lgEmail" autocomplete="username" autocapitalize="off" spellcheck="false">
     <label class="lbl" for="lgPass">Mot de passe</label>
-    <input type="password" id="lgPass" autocomplete="current-password" style="width:100%;padding:12px;border:1px solid var(--rule);border-radius:8px;background:var(--field);min-height:46px">
+    <input type="password" id="lgPass" autocomplete="current-password">
+    <div id="rowPass2" hidden><label class="lbl" for="lgPass2">Confirmer le mot de passe</label><input type="password" id="lgPass2" autocomplete="new-password"><p class="hint">6 caractères minimum.</p></div>
     <div class="actions"><button class="btn block" id="lgGo" type="button">Se connecter</button></div>
     <div class="err" id="lgErr" role="alert"></div>
     <button class="linkbtn" id="lgReset" type="button">Mot de passe oublié ?</button>
   </div>
 </section>
+<section class="login" id="onboard" hidden><div class="box" id="onboardBox"></div></section>
 <div class="wrap">
   <header class="top">
     <h1>Feuilles de soins</h1>
-    <p class="sub">Famille Dubois · CNMSS et CPS</p>
+    <p class="sub" id="hdrSub">&nbsp;</p>
   </header>
   <div class="banner" id="banner" hidden></div>
 
@@ -198,6 +220,7 @@ h2.sec{font-family:var(--head);font-size:22px;margin:22px 0 4px}
   <nav class="tabs" role="tablist">
     <button role="tab" aria-selected="true" data-tab="liste">Feuilles</button>
     <button role="tab" aria-selected="false" data-tab="bilan">Bilan</button>
+    <button role="tab" aria-selected="false" data-tab="params">Paramètres</button>
   </nav>
 
   <section id="tab-liste">
@@ -210,6 +233,7 @@ h2.sec{font-family:var(--head);font-size:22px;margin:22px 0 4px}
   </section>
 
   <section id="tab-bilan" hidden></section>
+  <section id="tab-params" hidden></section>
 </div>
 
 <button class="fab" id="fab" type="button">
@@ -287,20 +311,21 @@ h2.sec{font-family:var(--head);font-size:22px;margin:22px 0 4px}
 
 <script src="config.js"></script>
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
-import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, doc, setDoc, deleteDoc, getDoc, getDocs, onSnapshot } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, sendPasswordResetEmail, updateProfile, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, doc, setDoc, updateDoc, deleteDoc, getDoc, onSnapshot, query, where, arrayUnion, arrayRemove, deleteField } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
-const BENEFS = ["Dubois Jean-Louis","Bernard Vanessa","Dubois Matys","Dubois Maëline"];
-const ORGS = ["CNMSS","CPS"];
 const STATUS = {
   todo:{label:"À envoyer", cls:"todo"}, sent:{label:"Envoyée", cls:"sent"},
   late:{label:"À relancer", cls:"late"}, paid:{label:"Remboursée", cls:"paid"}
 };
-const S = { ready:false, user:null, feuilles:[], settings:{delai:45, devise:"XPF"}, filter:{st:"attente", benef:"", org:""}, tab:"liste", openId:null, form:null, unsub:[] };
+const S = { user:null, foyers:[], invites:[], foyerId:null, foyer:null, ready:false, feuilles:[], settings:{delai:45, devise:"XPF"},
+  filter:{st:"attente", benef:"", org:""}, tab:"liste", openId:null, form:null, unsubRoot:[], unsubFoyer:[], signup:false };
 const $ = s => document.querySelector(s);
 const esc = s => String(s==null?"":s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const sleep = ms => new Promise(r=>setTimeout(r,ms));
+const low = s => String(s||"").trim().toLowerCase();
+const ekey = e => low(e).replace(/[^a-z0-9]/g,"_");
 
 /* ---------- Firebase ---------- */
 let app, auth, db;
@@ -309,10 +334,16 @@ try{
   auth = getAuth(app);
   try{ db = initializeFirestore(app, {localCache: persistentLocalCache({tabManager: persistentMultipleTabManager()})}); }
   catch(e){ db = initializeFirestore(app, {}); }
-}catch(e){
-  $("#splash").textContent = "Configuration Firebase introuvable ou invalide (fichier config.js).";
-  throw e;
-}
+}catch(e){ $("#splash").textContent = "Configuration Firebase introuvable ou invalide (fichier config.js)."; throw e; }
+
+const B = () => (S.foyer && S.foyer.beneficiaires) || [];
+const O = () => (S.foyer && S.foyer.organismes) || [];
+const isAdmin = () => !!(S.foyer && S.user && (S.foyer.admins||[]).includes(S.user.uid));
+const isOwner = () => !!(S.foyer && S.user && S.foyer.owner===S.user.uid);
+const myName = () => (S.user && (S.user.displayName || S.pendingName)) || low(S.user && S.user.email);
+const foyerRef = () => doc(db,"foyers",S.foyerId);
+const fcol = n => collection(db,"foyers",S.foyerId,n);
+const fdoc = (n,id) => doc(db,"foyers",S.foyerId,n,id);
 
 /* ---------- dates & montants ---------- */
 function todayISO(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
@@ -329,37 +360,29 @@ function status(f){
   return "todo";
 }
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
-
-/* Écrit dans la base : l'écran avance tout de suite (le cache local garde la donnée hors connexion),
-   et une erreur éventuelle du serveur est signalée ensuite. */
+/* L'écran avance tout de suite (le cache local garde la donnée hors connexion) ; une erreur serveur est signalée ensuite. */
 async function write(p){ p.catch(saveError); await Promise.race([p, sleep(1200)]); }
 
-/* ---------- stockage ---------- */
+/* ---------- stockage des feuilles ---------- */
 const Store = {
   async saveFeuille(f){
-    const body = Object.assign({}, f); delete body.id; body.updatedAt = new Date().toISOString();
-    body.updatedBy = S.user ? S.user.email : "";
-    await write(setDoc(doc(db,"feuilles",f.id), body));
+    const body = Object.assign({}, f); delete body.id; body.updatedAt = new Date().toISOString(); body.updatedBy = S.user ? S.user.email : "";
+    await write(setDoc(fdoc("feuilles",f.id), body));
   },
-  async deleteFeuille(f){
-    for(const sc of (f.scans||[])) Store.deleteScan(sc);
-    await write(deleteDoc(doc(db,"feuilles",f.id)));
-  },
-  async saveSettings(st){ await write(setDoc(doc(db,"reglages","general"), st)); },
+  async deleteFeuille(f){ (f.scans||[]).forEach(sc=>Store.deleteScan(sc)); await write(deleteDoc(fdoc("feuilles",f.id))); },
   async addScan(file){
     const dataUrl = await compressToLimit(file, 800000);
-    const id = uid();
-    scanCache[id] = dataUrl;
-    await write(setDoc(doc(db,"scans",id), {img:dataUrl, createdAt:new Date().toISOString()}));
+    const id = uid(); scanCache[id] = dataUrl;
+    await write(setDoc(fdoc("scans",id), {img:dataUrl, createdAt:new Date().toISOString()}));
     return {d:id};
   },
-  deleteScan(sc){ if(sc && sc.d) deleteDoc(doc(db,"scans",sc.d)).catch(()=>{}); }
+  deleteScan(sc){ if(sc && sc.d) deleteDoc(fdoc("scans",sc.d)).catch(()=>{}); }
 };
-const scanCache = {};
+let scanCache = {};
 async function scanURL(sc){
   if(!sc || !sc.d) return null;
   if(scanCache[sc.d]) return scanCache[sc.d];
-  const s = await getDoc(doc(db,"scans",sc.d));
+  const s = await getDoc(fdoc("scans",sc.d));
   const v = s.exists() ? s.data().img : null;
   if(v) scanCache[sc.d]=v;
   return v;
@@ -380,7 +403,7 @@ async function compressToLimit(file, limit){
   return out;
 }
 
-/* ---------- rendu ---------- */
+/* ---------- rendu : feuilles ---------- */
 function visible(){
   const f=S.filter;
   return S.feuilles.filter(x=>{
@@ -399,6 +422,7 @@ function visible(){
     return (kb||"").localeCompare(ka||"");
   });
 }
+function renderHeader(){ $("#hdrSub").textContent = S.foyer ? S.foyer.nom + (O().length ? " · " + O().join(", ") : "") : " "; }
 function renderSummary(){
   let todo=0, wait=0, late=0, waitAmt=0;
   S.feuilles.forEach(f=>{ const s=status(f); if(s==="todo") todo++; if(s==="sent"||s==="late"){ wait++; waitAmt+=Number(f.montant)||0; } if(s==="late") late++; });
@@ -410,10 +434,10 @@ function renderChips(){
   $("#chips").innerHTML = opts.map(([k,l])=>`<button class="chip" data-st="${k}" aria-pressed="${S.filter.st===k}">${l}</button>`).join("");
 }
 function renderFilters(){
-  $("#fBenef").innerHTML = `<option value="">Tous les bénéficiaires</option>`+BENEFS.map(b=>`<option ${S.filter.benef===b?"selected":""}>${esc(b)}</option>`).join("");
-  $("#fOrg").innerHTML = `<option value="">CNMSS et CPS</option>`+ORGS.map(o=>`<option ${S.filter.org===o?"selected":""}>${o}</option>`).join("");
+  $("#fBenef").innerHTML = `<option value="">Tous les bénéficiaires</option>`+B().map(b=>`<option ${S.filter.benef===b?"selected":""}>${esc(b)}</option>`).join("");
+  $("#fOrg").innerHTML = `<option value="">Tous les organismes</option>`+O().map(o=>`<option ${S.filter.org===o?"selected":""}>${esc(o)}</option>`).join("");
 }
-function firstName(b){ return (b||"").split(" ").slice(1).join(" ")||b; }
+function shortName(b){ const p=(b||"").split(" "); return p.length>1 ? p.slice(1).join(" ") : b; }
 function renderList(){
   const el=$("#list");
   if(!S.ready){ el.innerHTML=`<div class="empty">Chargement des feuilles…</div>`; return; }
@@ -431,7 +455,7 @@ function renderList(){
     const th = (f.scans&&f.scans.length) ? `<span class="thumb" data-thumb="${f.id}">…</span>` : `<span class="thumb">Pas de photo</span>`;
     return `<button class="card s-${S2.cls}" data-open="${f.id}">
       ${th}
-      <span><h3>${esc(firstName(f.beneficiaire))} · ${esc(f.organisme)}</h3>
+      <span><h3>${esc(shortName(f.beneficiaire))} · ${esc(f.organisme)}</h3>
       <div class="meta">${esc(f.praticien||"Soin")} · ${fmtDate(f.dateSoins)}</div>
       <div class="amt">${money(f.montant)}</div>
       <div class="when ${st==="late"?"late":""}">${when}</div></span>
@@ -440,14 +464,17 @@ function renderList(){
   }).join("");
   v.forEach(f=>{ if(f.scans&&f.scans.length){ scanURL(f.scans[0]).then(u=>{ const t=document.querySelector(`[data-thumb="${f.id}"]`); if(t&&u){ t.style.backgroundImage=`url("${u}")`; t.textContent=""; } }).catch(()=>{}); } });
 }
+
+/* ---------- rendu : bilan ---------- */
 function renderBilan(){
   const years=[...new Set(S.feuilles.map(f=>(f.dateSoins||"").slice(0,4)).filter(Boolean))].sort().reverse();
   const cur = S.bilanYear || years[0] || String(new Date().getFullYear());
   const rows = S.feuilles.filter(f=>(f.dateSoins||"").startsWith(cur));
   const agg = key => { const m={}; rows.forEach(f=>{ const k=f[key]; m[k]=m[k]||{n:0,paye:0,remb:0,att:0}; m[k].n++; m[k].paye+=Number(f.montant)||0; if(f.statut==="remboursee") m[k].remb+=Number(f.montantRemb)||0; else m[k].att+=Number(f.montant)||0; }); return m; };
   const table = (m, order, title) => {
+    const keys = order.filter(k=>m[k]).concat(Object.keys(m).filter(k=>!order.includes(k)));
     let tot={n:0,paye:0,remb:0,att:0};
-    const body = order.filter(k=>m[k]).map(k=>{ const r=m[k]; tot.n+=r.n; tot.paye+=r.paye; tot.remb+=r.remb; tot.att+=r.att;
+    const body = keys.map(k=>{ const r=m[k]; tot.n+=r.n; tot.paye+=r.paye; tot.remb+=r.remb; tot.att+=r.att;
       return `<tr><td>${esc(k)}</td><td>${r.n}</td><td>${money(r.paye)}</td><td>${money(r.remb)}</td><td>${money(r.att)}</td></tr>`; }).join("");
     if(!body) return `<p class="hint">Aucune feuille en ${cur}.</p>`;
     return `<div class="tablewrap"><table><thead><tr><th>${title}</th><th>Feuilles</th><th>Payé</th><th>Remboursé</th><th>Non remboursé</th></tr></thead><tbody>${body}</tbody>
@@ -456,8 +483,8 @@ function renderBilan(){
   $("#tab-bilan").innerHTML = `
     <label class="lbl" for="bYear">Année des soins</label>
     <select class="inp" id="bYear">${(years.length?years:[cur]).map(y=>`<option ${y===cur?"selected":""}>${y}</option>`).join("")}</select>
-    <h2 class="sec">Par bénéficiaire</h2>${table(agg("beneficiaire"), BENEFS, "Bénéficiaire")}
-    <h2 class="sec">Par organisme</h2>${table(agg("organisme"), ORGS, "Organisme")}
+    <h2 class="sec">Par bénéficiaire</h2>${table(agg("beneficiaire"), B(), "Bénéficiaire")}
+    <h2 class="sec">Par organisme</h2>${table(agg("organisme"), O(), "Organisme")}
     <p class="hint">« Non remboursé » compte le montant payé des feuilles pas encore remboursées.</p>
     <h2 class="sec">Exporter et sauvegarder</h2>
     <div class="actions" style="margin-top:8px">
@@ -466,20 +493,92 @@ function renderBilan(){
       <label class="btn ghost block" style="position:relative;overflow:hidden">Importer une sauvegarde (.json)
         <input type="file" accept="application/json,.json" data-import="1" style="position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer"></label>
     </div>
-    <p class="hint" id="impStatus"></p>
-    <h2 class="sec">Réglages</h2>
+    <p class="hint" id="impStatus"></p>`;
+}
+
+/* ---------- rendu : paramètres ---------- */
+function listEditor(kind, items, admin){
+  const rows = items.map((x,i)=>`<div class="prow"><div class="top"><span class="name">${esc(x)}</span></div>
+    ${admin?`<div class="btns"><button class="sbtn" data-ren="${kind}:${i}">Renommer</button><button class="sbtn danger" data-del="${kind}:${i}">Supprimer</button></div>`:""}</div>`).join("") || `<p class="hint">Aucun élément.</p>`;
+  const add = admin ? `<div class="addrow"><input type="text" id="add-${kind}" placeholder="${kind==="benef"?"Prénom Nom":"Ex. Mutuelle"}"><button class="btn" data-add="${kind}" type="button">Ajouter</button></div>` : "";
+  return `<div class="plist">${rows}</div>${add}`;
+}
+function renderParams(){
+  const f=S.foyer; if(!f) return;
+  const admin=isAdmin();
+  const membres=f.membres||{};
+  const people=(f.members||[]).map(u=>{
+    const m=membres[u]||{}; const own=u===f.owner, adm=(f.admins||[]).includes(u), me=u===S.user.uid;
+    const pills=(own?`<span class="pill own">Propriétaire</span>`:adm?`<span class="pill adm">Admin</span>`:"");
+    let btns="";
+    if(admin){
+      btns+=`<button class="sbtn" data-pren="${u}">Modifier le nom</button>`;
+      if(m.email) btns+=`<button class="sbtn" data-preset="${esc(m.email)}">Réinitialiser le mot de passe</button>`;
+      if(!own) btns+= adm ? `<button class="sbtn" data-padm="${u}:0">Retirer admin</button>` : `<button class="sbtn" data-padm="${u}:1">Rendre admin</button>`;
+      if(!own) btns+=`<button class="sbtn danger" data-prm="${u}">Retirer l'accès</button>`;
+    }
+    return `<div class="prow"><div class="top"><span class="name">${esc(m.nom||m.email||"Utilisateur")}${me?" (vous)":""}</span>${pills}</div>
+      <div class="mail">${esc(m.email||"")}</div>${btns?`<div class="btns">${btns}</div>`:""}</div>`;
+  }).join("");
+  const inv=(f.invites||[]).map(e=>`<div class="prow"><div class="top"><span class="name">${esc((f.inviteNoms||{})[ekey(e)]||e)}</span><span class="pill inv">Invitation</span></div>
+      <div class="mail">${esc(e)}</div>${admin?`<div class="btns"><button class="sbtn danger" data-pinv="${esc(e)}">Annuler l'invitation</button></div>`:""}</div>`).join("");
+  const others = S.foyers.length>1 ? `<label class="lbl" for="selFoyer">Espace affiché</label><select class="inp" id="selFoyer">${S.foyers.map(x=>`<option value="${x.id}" ${x.id===S.foyerId?"selected":""}>${esc(x.nom)}</option>`).join("")}</select>` : "";
+  const recv = S.invites.length ? `<h2 class="sec">Invitations reçues</h2>${S.invites.map(x=>`<div class="prow"><div class="top"><span class="name">${esc(x.nom)}</span></div><div class="btns"><button class="btn" data-join="${x.id}">Rejoindre cet espace</button></div></div>`).join("")}` : "";
+
+  $("#tab-params").innerHTML = `
+    ${recv}
+    <h2 class="sec">Espace</h2>
+    ${others}
+    <label class="lbl" for="pNom">Nom de l'espace</label>
+    <div class="addrow" style="margin-top:0"><input type="text" id="pNom" value="${esc(f.nom)}" ${admin?"":"disabled"}>${admin?`<button class="btn" id="btnNom" type="button">OK</button>`:""}</div>
+    ${admin?"":`<p class="note">Seul un administrateur de l'espace peut modifier ces paramètres.</p>`}
+
+    <h2 class="sec">Bénéficiaires</h2>
+    ${listEditor("benef", B(), admin)}
+
+    <h2 class="sec">Organismes</h2>
+    ${listEditor("org", O(), admin)}
+
+    <h2 class="sec">Relances et devise</h2>
     <div class="row">
-      <div><label class="lbl" for="sDelai">Relancer après (jours)</label><input type="number" id="sDelai" min="1" inputmode="numeric" value="${esc(S.settings.delai)}"></div>
-      <div><label class="lbl" for="sDev">Devise</label><select class="inp" id="sDev"><option value="XPF" ${S.settings.devise!=="EUR"?"selected":""}>XPF</option><option value="EUR" ${S.settings.devise==="EUR"?"selected":""}>Euro</option></select></div>
+      <div><label class="lbl" for="sDelai">Relancer après (jours)</label><input type="number" id="sDelai" min="1" inputmode="numeric" value="${esc(S.settings.delai)}" ${admin?"":"disabled"}></div>
+      <div><label class="lbl" for="sDev">Devise</label><select class="inp" id="sDev" ${admin?"":"disabled"}><option value="XPF" ${S.settings.devise!=="EUR"?"selected":""}>XPF</option><option value="EUR" ${S.settings.devise==="EUR"?"selected":""}>Euro</option></select></div>
     </div>
-    <button class="btn block" id="btnSettings" type="button" style="margin-top:12px">Enregistrer les réglages</button>
-    <h2 class="sec">Compte</h2>
-    <p class="hint" style="font-size:15px">Connecté : <b>${esc(S.user?S.user.email:"")}</b></p>
-    <button class="btn danger block" id="btnLogout" type="button">Se déconnecter</button>`;
+    ${admin?`<button class="btn block" id="btnSettings" type="button" style="margin-top:12px">Enregistrer</button>`:""}
+
+    <h2 class="sec">Personnes ayant accès</h2>
+    <div class="plist">${people}${inv}</div>
+    ${admin?`<div class="card-box">
+      <strong>Ajouter une personne</strong>
+      <label class="lbl" for="npNom">Nom</label><input type="text" id="npNom" placeholder="Prénom Nom">
+      <label class="lbl" for="npEmail">Email (identifiant)</label><input type="email" id="npEmail" autocapitalize="off" spellcheck="false">
+      <label class="lbl" for="npPass">Mot de passe provisoire</label><input type="text" id="npPass" autocomplete="off" placeholder="6 caractères minimum">
+      <p class="note">Laisse le mot de passe vide pour envoyer seulement une invitation : la personne créera son compte elle-même avec cet email. Si l'email a déjà un compte, elle recevra une invitation dans ses Paramètres.</p>
+      <label style="display:flex;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" id="npAdmin"> Administrateur (peut gérer l'espace et les accès)</label>
+      <div class="actions"><button class="btn block" id="btnAddPerson" type="button">Créer l'accès</button></div>
+      <p class="note">Pour changer l'email d'une personne : retire son accès, puis recrée-le avec le nouvel email.</p>
+    </div>`:""}
+
+    <h2 class="sec">Mon compte</h2>
+    <div class="card-box">
+      <div>Connecté : <b>${esc(S.user.email)}</b></div>
+      <label class="lbl" for="myName">Mon nom</label>
+      <div class="addrow" style="margin-top:0"><input type="text" id="myName" value="${esc((membres[S.user.uid]||{}).nom||myName())}"><button class="btn" id="btnMyName" type="button">OK</button></div>
+      <label class="lbl" for="pwOld">Changer mon mot de passe</label>
+      <input type="password" id="pwOld" placeholder="Mot de passe actuel" autocomplete="current-password">
+      <input type="password" id="pwNew" placeholder="Nouveau mot de passe (6 caractères min.)" autocomplete="new-password" style="margin-top:8px">
+      <button class="btn ghost block" id="btnPw" type="button" style="margin-top:8px">Changer le mot de passe</button>
+    </div>
+    <div class="actions">
+      <button class="btn ghost block" id="btnNewFoyer" type="button">Créer un autre espace</button>
+      <button class="btn danger block" id="btnLogout" type="button">Se déconnecter</button>
+    </div>`;
 }
 function renderAll(){
-  renderSummary(); renderChips(); renderFilters(); renderList();
+  if(!S.foyer) return;
+  renderHeader(); renderSummary(); renderChips(); renderFilters(); renderList();
   if(S.tab==="bilan") renderBilan();
+  if(S.tab==="params" && !document.activeElement?.closest?.("#tab-params input, #tab-params select")) renderParams();
   if(S.openId && !$("#detailSheet").hidden) renderDetail();
 }
 
@@ -489,10 +588,10 @@ function closeDetail(){ $("#detailSheet").hidden=true; S.openId=null; document.b
 function renderDetail(stampPop){
   const f=S.feuilles.find(x=>x.id===S.openId); if(!f){ closeDetail(); return; }
   const st=status(f), S2=STATUS[st];
-  $("#detailTitle").textContent = firstName(f.beneficiaire)+" · "+f.organisme;
+  $("#detailTitle").textContent = shortName(f.beneficiaire)+" · "+f.organisme;
   const tl = `<ol class="timeline">
     <li class="done"><div class="t">Soins</div><div class="d">${fmtDate(f.dateSoins)} · ${money(f.montant)} payé</div></li>
-    <li class="${f.statut!=="a_envoyer"?"done":""}"><div class="t">Envoyée à la ${esc(f.organisme)}</div><div class="d">${f.dateEnvoi&&f.statut!=="a_envoyer"?fmtDate(f.dateEnvoi)+(f.statut==="envoyee"?" · il y a "+daysSince(f.dateEnvoi)+" jours":""):"Pas encore"}</div></li>
+    <li class="${f.statut!=="a_envoyer"?"done":""}"><div class="t">Envoyée à : ${esc(f.organisme)}</div><div class="d">${f.dateEnvoi&&f.statut!=="a_envoyer"?fmtDate(f.dateEnvoi)+(f.statut==="envoyee"?" · il y a "+daysSince(f.dateEnvoi)+" jours":""):"Pas encore"}</div></li>
     <li class="${f.statut==="remboursee"?"done":""}"><div class="t">Remboursement reçu</div><div class="d">${f.statut==="remboursee"?fmtDate(f.dateRemb)+" · "+money(f.montantRemb):"En attente"}</div></li>
   </ol>`;
   let act="";
@@ -507,9 +606,7 @@ function renderDetail(stampPop){
         <div><label class="lbl" for="mPaid" style="margin-top:0">Montant remboursé</label><input type="number" id="mPaid" step="any" min="0" inputmode="decimal" placeholder="${esc(f.montant||0)}"></div></div>
         <button class="btn paid block" data-act="doPaid" style="margin-top:10px">Confirmer le remboursement</button></div>
       <button class="btn ghost block" data-act="undoSend">Annuler l'envoi</button>`;
-  } else {
-    act=`<button class="btn ghost block" data-act="undoPaid">Annuler le remboursement</button>`;
-  }
+  } else act=`<button class="btn ghost block" data-act="undoPaid">Annuler le remboursement</button>`;
   $("#detailBody").innerHTML = `
     <span class="stamp big ${S2.cls} ${stampPop?"pop":""}">${S2.label}</span>
     <div class="photos" id="detPhotos">${(f.scans||[]).map((sc,i)=>`<button class="ph" data-view="${i}" aria-label="Voir la photo ${i+1}">…</button>`).join("") || `<span class="hint">Aucune photo.</span>`}</div>
@@ -521,9 +618,7 @@ function renderDetail(stampPop){
       ${f.updatedBy?`<dt>Modifiée par</dt><dd style="font-weight:400">${esc(f.updatedBy)}</dd>`:""}
     </dl>
     ${tl}
-    <div class="actions">${act}
-      <button class="btn danger block" data-act="delete">Supprimer la feuille</button>
-    </div>`;
+    <div class="actions">${act}<button class="btn danger block" data-act="delete">Supprimer la feuille</button></div>`;
   (f.scans||[]).forEach((sc,i)=>{ scanURL(sc).then(u=>{ const b=document.querySelector(`#detPhotos [data-view="${i}"]`); if(b&&u){ b.style.backgroundImage=`url("${u}")`; b.textContent=""; b.dataset.src=u; } }).catch(()=>{}); });
 }
 async function detailAction(a){
@@ -535,15 +630,13 @@ async function detailAction(a){
   if(a==="doPaid"){ const m=$("#mPaid").value; return upd({statut:"remboursee", dateRemb:$("#dPaid").value||todayISO(), montantRemb: m===""?"":Number(m)}, "Remboursement enregistré.", true); }
   if(a==="undoSend") return upd({statut:"a_envoyer", dateEnvoi:""}, "Envoi annulé.");
   if(a==="undoPaid") return upd({statut:"envoyee", dateRemb:"", montantRemb:""}, "Remboursement annulé.");
-  if(a==="delete"){
-    if(!confirm("Supprimer cette feuille et ses photos ? C'est définitif.")) return;
-    await Store.deleteFeuille(f); closeDetail(); toast("Feuille supprimée.");
-  }
+  if(a==="delete"){ if(!confirm("Supprimer cette feuille et ses photos ? C'est définitif.")) return; await Store.deleteFeuille(f); closeDetail(); toast("Feuille supprimée."); }
 }
 
 /* ---------- formulaire ---------- */
 function openForm(f){
-  S.form = f ? JSON.parse(JSON.stringify(f)) : {id:uid(), beneficiaire:"", organisme:"", dateSoins:todayISO(), montant:"", praticien:"", statut:"a_envoyer", dateEnvoi:"", dateRemb:"", montantRemb:"", notes:"", scans:[], createdAt:new Date().toISOString()};
+  if(!B().length || !O().length){ toast(isAdmin()?"Ajoute d'abord des bénéficiaires et des organismes dans Paramètres.":"Aucun bénéficiaire : demande à un administrateur d'en ajouter."); setTab("params"); return; }
+  S.form = f ? JSON.parse(JSON.stringify(f)) : {id:uid(), beneficiaire:B().length===1?B()[0]:"", organisme:O().length===1?O()[0]:"", dateSoins:todayISO(), montant:"", praticien:"", statut:"a_envoyer", dateEnvoi:"", dateRemb:"", montantRemb:"", notes:"", scans:[], createdAt:new Date().toISOString()};
   S.form._isNew=!f; S.form._added=[]; S.form._removed=[]; S.form._busy=0;
   $("#formTitle").textContent = f ? "Modifier la feuille" : "Nouvelle feuille";
   $("#inDateSoins").value=S.form.dateSoins||""; $("#inMontant").value=S.form.montant; $("#inPraticien").value=S.form.praticien||""; $("#inNotes").value=S.form.notes||"";
@@ -555,8 +648,10 @@ function openForm(f){
 }
 function renderFormSegs(){
   const F=S.form;
-  $("#segBenef").innerHTML = BENEFS.map(b=>`<button type="button" data-b="${esc(b)}" aria-pressed="${F.beneficiaire===b}">${esc(b)}</button>`).join("");
-  $("#segOrg").innerHTML = ORGS.map(o=>`<button type="button" data-o="${o}" aria-pressed="${F.organisme===o}">${o}</button>`).join("");
+  const bl = B().includes(F.beneficiaire)||!F.beneficiaire ? B() : B().concat([F.beneficiaire]);
+  const ol = O().includes(F.organisme)||!F.organisme ? O() : O().concat([F.organisme]);
+  $("#segBenef").innerHTML = bl.map(b=>`<button type="button" data-b="${esc(b)}" aria-pressed="${F.beneficiaire===b}">${esc(b)}</button>`).join("");
+  $("#segOrg").innerHTML = ol.map(o=>`<button type="button" data-o="${esc(o)}" aria-pressed="${F.organisme===o}">${esc(o)}</button>`).join("");
   $("#segEtat").querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed", String((F.statut==="a_envoyer"?"a_envoyer":"envoyee")===b.dataset.v)));
   $("#rowDateEnvoi").hidden = F.statut!=="envoyee";
 }
@@ -581,7 +676,7 @@ async function addFiles(files){
 }
 function closeForm(discard){
   const F=S.form;
-  if(discard && F){ F._added.forEach(sc=>Store.deleteScan(sc)); }
+  if(discard && F) F._added.forEach(sc=>Store.deleteScan(sc));
   S.form=null; $("#formSheet").hidden=true; if($("#detailSheet").hidden) document.body.style.overflow="";
 }
 async function saveForm(){
@@ -592,7 +687,7 @@ async function saveForm(){
   if(F.statut==="envoyee") F.dateEnvoi=$("#inDateEnvoi").value||todayISO();
   if(F.statut==="a_envoyer") F.dateEnvoi="";
   if(!F.beneficiaire){ toast("Choisis le bénéficiaire."); return; }
-  if(!F.organisme){ toast("Choisis CNMSS ou CPS."); return; }
+  if(!F.organisme){ toast("Choisis l'organisme."); return; }
   if(!F.dateSoins){ toast("Indique la date des soins."); return; }
   const out=Object.assign({}, F); ["_isNew","_added","_removed","_busy"].forEach(k=>delete out[k]);
   $("#formSave").disabled=true;
@@ -621,7 +716,7 @@ function buildCSV(){
 }
 async function doBackup(){
   const st=$("#impStatus"); st.textContent="Préparation de la sauvegarde…";
-  const out={format:"feuilles-de-soins-dubois",version:1,settings:S.settings,feuilles:[],scans:{}};
+  const out={format:"feuilles-de-soins-dubois",version:2,settings:S.settings,beneficiaires:B(),organismes:O(),feuilles:[],scans:{}};
   for(const f of S.feuilles){
     out.feuilles.push(Object.assign({}, f));
     for(const sc of (f.scans||[])){ const u=await scanURL(sc).catch(()=>null); if(u) out.scans[sc.d]=u; }
@@ -634,29 +729,177 @@ async function doImport(file){
   let data;
   try{ data=JSON.parse(await file.text()); }catch(e){ st.textContent="Ce fichier n'est pas une sauvegarde valide."; return; }
   if(!data || data.format!=="feuilles-de-soins-dubois" || !Array.isArray(data.feuilles)){ st.textContent="Ce fichier n'est pas une sauvegarde de cette application."; return; }
-  if(!confirm(`Importer ${data.feuilles.length} feuille(s) ? Les feuilles déjà présentes avec le même identifiant seront remplacées.`)) return;
+  if(!confirm(`Importer ${data.feuilles.length} feuille(s) dans l'espace « ${S.foyer.nom} » ?`)) return;
+  if(isAdmin()){
+    const nb=[...new Set(data.feuilles.map(f=>f.beneficiaire).filter(b=>b && !B().includes(b)))];
+    const no=[...new Set(data.feuilles.map(f=>f.organisme).filter(o=>o && !O().includes(o)))];
+    if(nb.length||no.length) await updateDoc(foyerRef(), {beneficiaires:B().concat(nb), organismes:O().concat(no)}).catch(()=>{});
+  }
   let n=0, errors=0;
   for(const f of data.feuilles){
     st.textContent=`Import en cours… ${n}/${data.feuilles.length}`;
     try{
-      for(const sc of (f.scans||[])){ if(sc.d && data.scans && data.scans[sc.d]) await setDoc(doc(db,"scans",sc.d), {img:data.scans[sc.d], createdAt:new Date().toISOString()}); }
-      const body=Object.assign({}, f); const id=body.id; delete body.id;
+      for(const sc of (f.scans||[])){ if(sc.d && data.scans && data.scans[sc.d]) await setDoc(fdoc("scans",sc.d), {img:data.scans[sc.d], createdAt:new Date().toISOString()}); }
+      const body=Object.assign({}, f); const id=body.id||uid(); delete body.id;
       body.scans=(f.scans||[]).filter(sc=>sc.d);
-      await setDoc(doc(db,"feuilles",id), body);
-      n++;
+      await setDoc(fdoc("feuilles",id), body); n++;
     }catch(e){ errors++; console.error(e); }
   }
-  if(data.settings && data.settings.delai) await setDoc(doc(db,"reglages","general"), data.settings).catch(()=>{});
   st.textContent = errors ? `Import terminé : ${n} feuille(s) importée(s), ${errors} en erreur.` : `Import terminé : ${n} feuille(s) importée(s).`;
   toast("Import terminé.");
 }
 
+/* ---------- gestion de l'espace ---------- */
+async function adminDo(p, ok){ try{ await p; if(ok) toast(ok); }catch(e){ saveError(e); } }
+async function renameItem(kind, i){
+  const key = kind==="benef" ? "beneficiaires" : "organismes";
+  const list = (kind==="benef"?B():O()).slice(); const old=list[i];
+  const nv = (prompt("Nouveau nom :", old)||"").trim();
+  if(!nv || nv===old) return;
+  if(list.includes(nv)){ toast("Ce nom existe déjà."); return; }
+  list[i]=nv;
+  await adminDo(updateDoc(foyerRef(), {[key]:list}));
+  const field = kind==="benef" ? "beneficiaire" : "organisme";
+  S.feuilles.filter(f=>f[field]===old).forEach(f=>{ updateDoc(fdoc("feuilles",f.id), {[field]:nv}).catch(()=>{}); });
+  toast("Renommé.");
+}
+async function deleteItem(kind, i){
+  const key = kind==="benef" ? "beneficiaires" : "organismes";
+  const list = (kind==="benef"?B():O()).slice(); const old=list[i];
+  const field = kind==="benef" ? "beneficiaire" : "organisme";
+  const used = S.feuilles.filter(f=>f[field]===old).length;
+  if(!confirm(used ? `« ${old} » est utilisé par ${used} feuille(s). Le retirer de la liste ? Les feuilles existantes sont conservées.` : `Retirer « ${old} » ?`)) return;
+  list.splice(i,1);
+  await adminDo(updateDoc(foyerRef(), {[key]:list}), "Retiré.");
+}
+async function addItem(kind){
+  const key = kind==="benef" ? "beneficiaires" : "organismes";
+  const inp=$("#add-"+kind); const v=(inp.value||"").trim(); if(!v) return;
+  const list=(kind==="benef"?B():O()).slice();
+  if(list.includes(v)){ toast("Déjà dans la liste."); return; }
+  list.push(v); inp.value="";
+  await adminDo(updateDoc(foyerRef(), {[key]:list}), "Ajouté.");
+}
+async function addPerson(){
+  const nom=$("#npNom").value.trim(), email=low($("#npEmail").value), pass=$("#npPass").value, admin=$("#npAdmin").checked;
+  if(!email || !email.includes("@")){ toast("Indique un email valide."); return; }
+  const membres=S.foyer.membres||{};
+  if(Object.values(membres).some(m=>low(m.email)===email)){ toast("Cette personne a déjà accès."); return; }
+  if(pass && pass.length<6){ toast("Mot de passe : 6 caractères minimum."); return; }
+  const btn=$("#btnAddPerson"); btn.disabled=true; btn.textContent="Création…";
+  let newUid=null;
+  try{
+    if(pass){
+      const sec=initializeApp(window.FIREBASE_CONFIG, "creation-"+Date.now());
+      const sa=getAuth(sec);
+      try{ const c=await createUserWithEmailAndPassword(sa, email, pass); if(nom) await updateProfile(c.user,{displayName:nom}).catch(()=>{}); newUid=c.user.uid; }
+      catch(e){ if(!(e.code||"").includes("email-already-in-use")) throw e; }
+      finally{ await signOut(sa).catch(()=>{}); await deleteApp(sec).catch(()=>{}); }
+    }
+    if(newUid){
+      const up={members:arrayUnion(newUid), ["membres."+newUid]:{nom:nom||email, email, ajouteLe:new Date().toISOString()}};
+      if(admin) up.admins=arrayUnion(newUid);
+      await updateDoc(foyerRef(), up);
+      toast("Accès créé. Transmets l'email et le mot de passe provisoire à la personne.");
+    } else {
+      await updateDoc(foyerRef(), {invites:arrayUnion(email), ["inviteNoms."+ekey(email)]:nom||email});
+      toast(pass ? "Cet email a déjà un compte : une invitation lui a été envoyée dans l'application." : "Invitation créée : la personne doit créer son compte avec cet email.");
+    }
+    ["#npNom","#npEmail","#npPass"].forEach(s=>$(s).value=""); $("#npAdmin").checked=false;
+  }catch(e){
+    const c=e.code||"";
+    if(c.includes("weak-password")) toast("Mot de passe trop faible (6 caractères minimum).");
+    else if(c.includes("invalid-email")) toast("Adresse email invalide.");
+    else saveError(e);
+  }
+  btn.disabled=false; btn.textContent="Créer l'accès";
+}
+async function acceptInvite(fid){
+  const f=S.invites.find(x=>x.id===fid); if(!f) return;
+  const email=low(S.user.email);
+  const nom=(f.inviteNoms||{})[ekey(email)] || myName();
+  try{
+    await updateDoc(doc(db,"foyers",fid), {members:arrayUnion(S.user.uid), invites:arrayRemove(email), ["membres."+S.user.uid]:{nom, email, ajouteLe:new Date().toISOString()}});
+    localStorage.setItem("fds-foyer", fid); toast("Bienvenue dans « "+f.nom+" » !");
+  }catch(e){ saveError(e); }
+}
+async function createFoyer(nom, benefs, orgs){
+  const u=S.user; const email=low(u.email);
+  const ref=doc(collection(db,"foyers"));
+  await setDoc(ref, {nom, owner:u.uid, admins:[u.uid], members:[u.uid], invites:[], inviteNoms:{},
+    membres:{[u.uid]:{nom:myName(), email, ajouteLe:new Date().toISOString()}},
+    beneficiaires:benefs, organismes:orgs, settings:{delai:45, devise:"XPF"}, createdAt:new Date().toISOString()});
+  localStorage.setItem("fds-foyer", ref.id);
+}
+async function changePassword(){
+  const old=$("#pwOld").value, nv=$("#pwNew").value;
+  if(!old||!nv){ toast("Remplis les deux champs."); return; }
+  if(nv.length<6){ toast("Nouveau mot de passe : 6 caractères minimum."); return; }
+  try{
+    await reauthenticateWithCredential(S.user, EmailAuthProvider.credential(S.user.email, old));
+    await updatePassword(S.user, nv);
+    $("#pwOld").value=""; $("#pwNew").value=""; toast("Mot de passe changé.");
+  }catch(e){ toast(authMsg(e)); }
+}
+
+/* ---------- espaces : chargement ---------- */
+function stopFoyer(){ S.unsubFoyer.forEach(u=>u()); S.unsubFoyer=[]; S.feuilles=[]; S.ready=false; scanCache={}; }
+function stopAll(){ S.unsubRoot.forEach(u=>u()); S.unsubRoot=[]; stopFoyer(); S.foyers=[]; S.invites=[]; S.foyerId=null; S.foyer=null; }
+function startFoyer(){
+  S.unsubFoyer.push(onSnapshot(fcol("feuilles"), snap=>{
+    S.feuilles = snap.docs.map(d=>Object.assign({id:d.id}, d.data())); S.ready=true; $("#banner").hidden=true; renderAll();
+  }, err=>{ const b=$("#banner"); b.hidden=false; b.textContent = err.code==="permission-denied" ? "Accès refusé à cet espace." : "La synchronisation s'est arrêtée. Recharge l'application."; }));
+}
+function chooseFoyer(){
+  if(!S.foyers.length){ stopFoyer(); S.foyerId=null; S.foyer=null; showOnboard(); return; }
+  const has = x => x && S.foyers.some(f=>f.id===x);
+  const pref = localStorage.getItem("fds-foyer");
+  const id = has(pref) ? pref : has(S.foyerId) ? S.foyerId : S.foyers[0].id;
+  if(id!==S.foyerId){ stopFoyer(); S.foyerId=id; startFoyer(); }
+  S.foyer=S.foyers.find(f=>f.id===id);
+  S.settings=Object.assign({delai:45, devise:"XPF"}, S.foyer.settings||{});
+  if(S.filter.benef && !B().includes(S.filter.benef)) S.filter.benef="";
+  if(S.filter.org && !O().includes(S.filter.org)) S.filter.org="";
+  $("#onboard").hidden=true;
+  renderAll();
+}
+function watchFoyers(){
+  let gotMembers=false;
+  S.unsubRoot.push(onSnapshot(query(collection(db,"foyers"), where("members","array-contains",S.user.uid)), snap=>{
+    gotMembers=true; S.foyers=snap.docs.map(d=>Object.assign({id:d.id}, d.data())); chooseFoyer();
+  }, err=>{ console.error(err); $("#splash").hidden=false; $("#splash").textContent="Accès à la base refusé. Vérifie les règles Firestore."; }));
+  const email=low(S.user.email);
+  S.unsubRoot.push(onSnapshot(query(collection(db,"foyers"), where("invites","array-contains",email)), snap=>{
+    S.invites=snap.docs.map(d=>Object.assign({id:d.id}, d.data()));
+    if(gotMembers && !S.foyers.length) showOnboard();
+    if(S.tab==="params" && S.foyer) renderParams();
+  }, ()=>{}));
+}
+function showOnboard(force){
+  const u=S.user; if(!u) return;
+  const inv = S.invites.length ? `<h2 class="sec">Invitations</h2>${S.invites.map(x=>`<div class="prow"><div class="top"><span class="name">${esc(x.nom)}</span></div><div class="btns"><button class="btn" data-join="${x.id}">Rejoindre cet espace</button></div></div>`).join("")}<h2 class="sec">Ou créer votre propre espace</h2>` : "";
+  $("#onboardBox").innerHTML = `
+    <h1>${force?"Nouvel espace":"Bienvenue"}</h1>
+    <p class="sub">${esc(u.email)}</p>
+    ${inv}
+    ${inv?"":`<p style="margin-top:16px">Crée ton espace : les personnes que tu y ajouteras (conjoint, famille…) partageront les mêmes feuilles de soins.</p>`}
+    <label class="lbl" for="obNom">Nom de l'espace</label>
+    <input type="text" id="obNom" placeholder="Ex. Famille Martin">
+    <label class="lbl" for="obBen">Bénéficiaires (un par ligne)</label>
+    <textarea id="obBen" style="min-height:120px">${esc(myName()===low(u.email)?"":myName())}</textarea>
+    <label class="lbl" for="obOrg">Organismes (un par ligne)</label>
+    <textarea id="obOrg">CNMSS\nCPS</textarea>
+    <div class="actions"><button class="btn block" id="obGo" type="button">Créer mon espace</button>
+    ${force?`<button class="btn ghost block" id="obCancel" type="button">Annuler</button>`:`<button class="btn ghost block" id="obLogout" type="button">Se déconnecter</button>`}</div>`;
+  $("#onboard").hidden=false;
+}
+
 /* ---------- divers ---------- */
 let toastT;
-function toast(m){ const t=$("#toast"); t.textContent=m; t.hidden=false; clearTimeout(toastT); toastT=setTimeout(()=>t.hidden=true, 3000); }
+function toast(m){ const t=$("#toast"); t.textContent=m; t.hidden=false; clearTimeout(toastT); toastT=setTimeout(()=>t.hidden=true, 3500); }
 function saveError(e){
   const c=e&&e.code;
-  if(c==="permission-denied") toast("Accès refusé : cet email n'est pas autorisé dans les règles Firestore.");
+  if(c==="permission-denied") toast("Action refusée : tu n'as pas les droits nécessaires.");
   else if(c==="resource-exhausted") toast("Limite gratuite atteinte pour aujourd'hui. Réessaie demain.");
   else toast("Enregistrement impossible. Vérifie ta connexion et réessaie.");
   console.error(e);
@@ -664,31 +907,54 @@ function saveError(e){
 function setTab(t){
   S.tab=t;
   document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-selected", String(b.dataset.tab===t)));
-  $("#tab-liste").hidden = t!=="liste"; $("#tab-bilan").hidden = t!=="bilan"; $("#fab").hidden = t!=="liste";
+  $("#tab-liste").hidden = t!=="liste"; $("#tab-bilan").hidden = t!=="bilan"; $("#tab-params").hidden = t!=="params"; $("#fab").hidden = t!=="liste";
   if(t==="bilan") renderBilan();
+  if(t==="params") renderParams();
 }
 
-/* ---------- connexion ---------- */
+/* ---------- connexion / création de compte ---------- */
 function authMsg(e){
   const c=(e&&e.code)||"";
   if(c.includes("invalid-credential")||c.includes("wrong-password")||c.includes("user-not-found")||c.includes("invalid-login")) return "Email ou mot de passe incorrect.";
+  if(c.includes("email-already-in-use")) return "Un compte existe déjà avec cet email : connecte-toi.";
+  if(c.includes("weak-password")) return "Mot de passe trop faible (6 caractères minimum).";
   if(c.includes("invalid-email")) return "Adresse email invalide.";
   if(c.includes("too-many-requests")) return "Trop d'essais. Patiente quelques minutes.";
+  if(c.includes("requires-recent-login")) return "Reconnecte-toi puis réessaie.";
   if(c.includes("network")) return "Pas de connexion internet.";
   if(c.includes("api-key")) return "Configuration Firebase invalide : vérifie la clé apiKey dans config.js.";
-  return "Connexion impossible ("+c+").";
+  if(c.includes("operation-not-allowed")) return "La création de compte est désactivée dans Firebase.";
+  return "Opération impossible ("+c+").";
 }
-async function login(){
+function setMode(signup){
+  S.signup=signup;
+  $("#modeLogin").setAttribute("aria-pressed", String(!signup)); $("#modeSignup").setAttribute("aria-pressed", String(signup));
+  $("#rowNom").hidden=!signup; $("#rowPass2").hidden=!signup; $("#lgReset").hidden=signup;
+  $("#lgGo").textContent = signup ? "Créer mon compte" : "Se connecter";
+  $("#lgPass").setAttribute("autocomplete", signup?"new-password":"current-password");
+  $("#lgErr").textContent="";
+}
+async function submitAuth(){
   const email=$("#lgEmail").value.trim(), pass=$("#lgPass").value;
   $("#lgErr").textContent="";
   if(!email||!pass){ $("#lgErr").textContent="Saisis ton email et ton mot de passe."; return; }
   $("#lgGo").disabled=true;
-  try{ await signInWithEmailAndPassword(auth, email, pass); }
-  catch(e){ $("#lgErr").textContent=authMsg(e); }
+  try{
+    if(S.signup){
+      const nom=$("#lgNom").value.trim();
+      if(!nom){ $("#lgErr").textContent="Indique ton nom."; $("#lgGo").disabled=false; return; }
+      if(pass!==$("#lgPass2").value){ $("#lgErr").textContent="Les deux mots de passe ne sont pas identiques."; $("#lgGo").disabled=false; return; }
+      S.pendingName=nom;
+      const c=await createUserWithEmailAndPassword(auth, email, pass);
+      await updateProfile(c.user, {displayName:nom}).catch(()=>{});
+    } else await signInWithEmailAndPassword(auth, email, pass);
+  }catch(e){ $("#lgErr").textContent=authMsg(e); }
   $("#lgGo").disabled=false;
 }
-$("#lgGo").addEventListener("click", login);
-$("#lgPass").addEventListener("keydown", e=>{ if(e.key==="Enter") login(); });
+$("#modeLogin").addEventListener("click", ()=>setMode(false));
+$("#modeSignup").addEventListener("click", ()=>setMode(true));
+$("#lgGo").addEventListener("click", submitAuth);
+$("#lgPass").addEventListener("keydown", e=>{ if(e.key==="Enter" && !S.signup) submitAuth(); });
 $("#lgReset").addEventListener("click", async ()=>{
   const email=$("#lgEmail").value.trim();
   if(!email){ $("#lgErr").textContent="Saisis d'abord ton email ci-dessus."; return; }
@@ -696,38 +962,40 @@ $("#lgReset").addEventListener("click", async ()=>{
   catch(e){ $("#lgErr").textContent=authMsg(e); }
 });
 
-function startData(){
-  S.unsub.push(onSnapshot(collection(db,"feuilles"), snap=>{
-    S.feuilles = snap.docs.map(d=>Object.assign({id:d.id}, d.data()));
-    S.ready=true; $("#banner").hidden=true; renderAll();
-  }, err=>{
-    const b=$("#banner"); b.hidden=false;
-    b.textContent = err.code==="permission-denied" ? "Accès refusé : ton email n'est pas autorisé dans les règles Firestore." : "La synchronisation s'est arrêtée. Recharge l'application.";
-  }));
-  S.unsub.push(onSnapshot(doc(db,"reglages","general"), s=>{ if(s.exists()){ S.settings=Object.assign({delai:45,devise:"XPF"}, s.data()); renderAll(); } }, ()=>{}));
-}
-function stopData(){ S.unsub.forEach(u=>u()); S.unsub=[]; S.feuilles=[]; S.ready=false; }
-
 onAuthStateChanged(auth, user=>{
   $("#splash").hidden=true;
+  stopAll(); closeDetail(); if(S.form) closeForm(false);
   S.user=user;
-  if(user){ $("#login").hidden=true; $("#lgPass").value=""; startData(); renderAll(); }
-  else { stopData(); closeDetail(); if(S.form) closeForm(false); setTab("liste"); $("#login").hidden=false; }
+  if(!user){ $("#onboard").hidden=true; $("#login").hidden=false; setTab("liste"); return; }
+  $("#login").hidden=true; $("#lgPass").value=""; $("#lgPass2").value="";
+  setTab("liste"); renderList();
+  watchFoyers();
 });
 
 /* ---------- événements ---------- */
-document.addEventListener("click", e=>{
+document.addEventListener("click", async e=>{
   const t=e.target.closest("button"); if(!t) return;
-  if(t.dataset.tab) return setTab(t.dataset.tab);
-  if(t.dataset.st){ S.filter.st=t.dataset.st; return renderAll(); }
-  if(t.dataset.sum){ S.filter.st=t.dataset.sum; setTab("liste"); return renderAll(); }
-  if(t.dataset.open) return openDetail(t.dataset.open);
-  if(t.dataset.act) return detailAction(t.dataset.act);
-  if(t.dataset.view!=null && t.dataset.src){ $("#viewerImg").src=t.dataset.src; $("#viewer").classList.remove("zoom"); $("#viewer").hidden=false; return; }
-  if(t.dataset.b && S.form){ S.form.beneficiaire=t.dataset.b; return renderFormSegs(); }
-  if(t.dataset.o && S.form){ S.form.organisme=t.dataset.o; return renderFormSegs(); }
-  if(t.dataset.v && S.form){ S.form.statut=t.dataset.v; return renderFormSegs(); }
-  if(t.dataset.rm!=null && S.form){ const sc=S.form.scans.splice(Number(t.dataset.rm),1)[0]; const ai=S.form._added.indexOf(sc); if(ai>=0){ S.form._added.splice(ai,1); Store.deleteScan(sc); } else S.form._removed.push(sc); return renderFormPhotos(); }
+  const d=t.dataset;
+  if(d.tab) return setTab(d.tab);
+  if(d.st){ S.filter.st=d.st; return renderAll(); }
+  if(d.sum){ S.filter.st=d.sum; setTab("liste"); return renderAll(); }
+  if(d.open) return openDetail(d.open);
+  if(d.act) return detailAction(d.act);
+  if(d.view!=null && d.src){ $("#viewerImg").src=d.src; $("#viewer").classList.remove("zoom"); $("#viewer").hidden=false; return; }
+  if(d.b && S.form){ S.form.beneficiaire=d.b; return renderFormSegs(); }
+  if(d.o && S.form){ S.form.organisme=d.o; return renderFormSegs(); }
+  if(d.v && S.form){ S.form.statut=d.v; return renderFormSegs(); }
+  if(d.rm!=null && S.form){ const sc=S.form.scans.splice(Number(d.rm),1)[0]; const ai=S.form._added.indexOf(sc); if(ai>=0){ S.form._added.splice(ai,1); Store.deleteScan(sc); } else S.form._removed.push(sc); return renderFormPhotos(); }
+  if(d.ren){ const [k,i]=d.ren.split(":"); return renameItem(k, Number(i)); }
+  if(d.del){ const [k,i]=d.del.split(":"); return deleteItem(k, Number(i)); }
+  if(d.add) return addItem(d.add);
+  if(d.join) return acceptInvite(d.join);
+  if(d.pren){ const m=(S.foyer.membres||{})[d.pren]||{}; const nv=(prompt("Nom affiché :", m.nom||"")||"").trim(); if(nv) adminDo(updateDoc(foyerRef(), {["membres."+d.pren+".nom"]:nv}), "Nom modifié."); return; }
+  if(d.preset){ if(confirm("Envoyer un email de réinitialisation du mot de passe à "+d.preset+" ?")) adminDo(sendPasswordResetEmail(auth, d.preset), "Email envoyé à "+d.preset+"."); return; }
+  if(d.padm){ const [u,on]=d.padm.split(":"); return adminDo(updateDoc(foyerRef(), {admins: on==="1"?arrayUnion(u):arrayRemove(u)}), on==="1"?"Droits d'administrateur donnés.":"Droits d'administrateur retirés."); }
+  if(d.prm){ const m=(S.foyer.membres||{})[d.prm]||{}; if(!confirm("Retirer l'accès de "+(m.nom||m.email||"cette personne")+" à cet espace ?")) return;
+    return adminDo(updateDoc(foyerRef(), {members:arrayRemove(d.prm), admins:arrayRemove(d.prm), ["membres."+d.prm]:deleteField()}), "Accès retiré."); }
+  if(d.pinv){ return adminDo(updateDoc(foyerRef(), {invites:arrayRemove(d.pinv), ["inviteNoms."+ekey(d.pinv)]:deleteField()}), "Invitation annulée."); }
   switch(t.id){
     case "fab": return openForm(null);
     case "formClose": return closeForm(true);
@@ -737,11 +1005,29 @@ document.addEventListener("click", e=>{
     case "viewerClose": $("#viewer").hidden=true; return;
     case "btnExport": if(!S.feuilles.length){ toast("Aucune feuille à exporter."); return; } download("feuilles-de-soins-"+todayISO()+".csv", buildCSV(), "text/csv;charset=utf-8"); return;
     case "btnBackup": return doBackup();
-    case "btnLogout": if(confirm("Se déconnecter de l'application ?")) signOut(auth); return;
+    case "btnLogout": case "obLogout": if(confirm("Se déconnecter ?")) signOut(auth); return;
     case "btnSettings": {
-      const d=parseInt($("#sDelai").value,10); if(!(d>0)){ toast("Indique un nombre de jours."); return; }
-      const st={delai:d, devise:$("#sDev").value}; S.settings=st;
-      Store.saveSettings(st).then(()=>{ renderAll(); toast("Réglages enregistrés."); }); return;
+      const dl=parseInt($("#sDelai").value,10); if(!(dl>0)){ toast("Indique un nombre de jours."); return; }
+      return adminDo(updateDoc(foyerRef(), {settings:{delai:dl, devise:$("#sDev").value}}), "Réglages enregistrés.");
+    }
+    case "btnNom": { const v=$("#pNom").value.trim(); if(v) adminDo(updateDoc(foyerRef(), {nom:v}), "Nom de l'espace modifié."); return; }
+    case "btnMyName": { const v=$("#myName").value.trim(); if(!v) return; updateProfile(S.user,{displayName:v}).catch(()=>{});
+      return adminDo(updateDoc(foyerRef(), {["membres."+S.user.uid+".nom"]:v}).catch(e=>{ if(e.code==="permission-denied") return; throw e; }), "Nom modifié."); }
+    case "btnPw": return changePassword();
+    case "btnAddPerson": return addPerson();
+    case "btnNewFoyer": return showOnboard(true);
+    case "obCancel": $("#onboard").hidden=true; return;
+    case "obGo": {
+      const nom=$("#obNom").value.trim();
+      const lines = s => [...new Set(s.split("\n").map(x=>x.trim()).filter(Boolean))];
+      const ben=lines($("#obBen").value), org=lines($("#obOrg").value);
+      if(!nom){ toast("Donne un nom à l'espace."); return; }
+      if(!ben.length){ toast("Ajoute au moins un bénéficiaire."); return; }
+      if(!org.length){ toast("Ajoute au moins un organisme."); return; }
+      t.disabled=true;
+      try{ await createFoyer(nom, ben, org); $("#onboard").hidden=true; if(S.foyers.length) chooseFoyer(); toast("Espace créé !"); }
+      catch(err){ saveError(err); }
+      t.disabled=false; return;
     }
   }
 });
@@ -753,9 +1039,8 @@ document.addEventListener("change", e=>{
   if(t.dataset && t.dataset.file){ const fl=[...(t.files||[])]; if(fl.length) addFiles(fl); return; }
   if(t.dataset && t.dataset.import){ const f=t.files&&t.files[0]; if(f) doImport(f); t.value=""; return; }
   if(t.id==="bYear"){ S.bilanYear=t.value; renderBilan(); }
+  if(t.id==="selFoyer"){ localStorage.setItem("fds-foyer", t.value); chooseFoyer(); renderParams(); }
 });
-
-renderAll();
 
 /* ---------- appli installable ---------- */
 if("serviceWorker" in navigator){ window.addEventListener("load", ()=>navigator.serviceWorker.register("sw.js").catch(()=>{})); }
