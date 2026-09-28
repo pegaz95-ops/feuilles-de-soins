@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Feuilles de soins – Famille Dubois</title>
+<meta name="theme-color" content="#1F3A2E">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#EEF3EC; --sheet:#FBFDF9; --ink:#1F3A2E; --ink-2:#4E6659; --rule:#C9D8CC;
+  --todo:#A8600E; --sent:#2D4B8E; --paid:#1E7A4C; --late:#B3261E;
+  --field:#FFFFFF; --shadow:0 1px 0 rgba(31,58,46,.12);
+  --body:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --head:"Barlow Semi Condensed","Arial Narrow",system-ui,sans-serif;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
+  --paper:#12201A; --sheet:#1A2B23; --ink:#E3EEE6; --ink-2:#A8BFB1; --rule:#2F463B;
+  --todo:#E6A04A; --sent:#8FA8E8; --paid:#62C792; --late:#F07A70; --field:#15251E; --shadow:none;
+}}
+:root[data-theme="dark"]{
+  --paper:#12201A; --sheet:#1A2B23; --ink:#E3EEE6; --ink-2:#A8BFB1; --rule:#2F463B;
+  --todo:#E6A04A; --sent:#8FA8E8; --paid:#62C792; --late:#F07A70; --field:#15251E; --shadow:none;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.45;-webkit-text-size-adjust:100%}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--sent);outline-offset:2px}
+.wrap{max-width:720px;margin:0 auto;padding:0 16px 120px}
+header.top{padding:20px 0 8px}
+h1{font-family:var(--head);font-weight:700;font-size:30px;line-height:1.1;margin:0;letter-spacing:.2px}
+.sub{color:var(--ink-2);margin:6px 0 0}
+.banner{margin:12px 0;padding:10px 12px;border:1px dashed var(--todo);border-radius:8px;color:var(--ink);background:var(--sheet);font-size:14px}
+.banner[hidden]{display:none}
+
+/* résumé */
+.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:16px 0 8px}
+.sum{background:var(--sheet);border:1px solid var(--rule);border-radius:10px;padding:10px 12px;text-align:left}
+.sum b{display:block;font-family:var(--head);font-size:24px;line-height:1.1}
+.sum span{font-size:13px;color:var(--ink-2)}
+.sum.todo b{color:var(--todo)} .sum.sent b{color:var(--sent)} .sum.late b{color:var(--late)}
+button.sum{cursor:pointer}
+button.sum[aria-pressed="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+
+/* onglets */
+nav.tabs{display:flex;gap:4px;border-bottom:2px solid var(--rule);margin:16px 0 12px}
+nav.tabs button{background:none;border:0;padding:10px 12px;font-family:var(--head);font-size:18px;font-weight:600;color:var(--ink-2);border-bottom:3px solid transparent;margin-bottom:-2px}
+nav.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--ink)}
+
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.filters select{flex:1 1 140px;min-width:0;padding:10px;border:1px solid var(--rule);border-radius:8px;background:var(--field)}
+.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:8px;-webkit-overflow-scrolling:touch}
+.chip{flex:none;border:1px solid var(--rule);background:var(--sheet);border-radius:999px;padding:7px 14px;font-size:15px}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--sheet);border-color:var(--ink)}
+
+/* cartes = feuilles */
+.list{display:flex;flex-direction:column;gap:10px}
+.card{position:relative;display:grid;grid-template-columns:56px 1fr;gap:12px;align-items:start;width:100%;text-align:left;background:var(--sheet);border:1px solid var(--rule);border-left:6px solid var(--rule);border-radius:6px;padding:12px 12px 12px 10px;box-shadow:var(--shadow);overflow:hidden}
+.card.s-todo{border-left-color:var(--todo)} .card.s-sent{border-left-color:var(--sent)} .card.s-paid{border-left-color:var(--paid)} .card.s-late{border-left-color:var(--late)}
+.thumb{width:56px;height:72px;border-radius:4px;background:var(--paper) center/cover no-repeat;border:1px solid var(--rule);display:grid;place-items:center;color:var(--ink-2);font-size:12px}
+.card h3{margin:0;font-family:var(--head);font-size:19px;font-weight:600;line-height:1.2;padding-right:92px}
+.meta{color:var(--ink-2);font-size:14px;margin-top:2px}
+.amt{font-family:var(--head);font-weight:600;font-size:18px;margin-top:6px}
+.when{font-size:14px;margin-top:2px}
+.when.late{color:var(--late);font-weight:700}
+
+/* le tampon : l'élément fort de l'interface */
+.stamp{position:absolute;top:10px;right:10px;transform:rotate(-7deg);font-family:var(--head);font-weight:700;font-size:13px;letter-spacing:.8px;text-transform:uppercase;padding:3px 8px;border:2.5px solid currentColor;border-radius:4px;opacity:.9;background:transparent;line-height:1.1}
+.stamp.todo{color:var(--todo)} .stamp.sent{color:var(--sent)} .stamp.paid{color:var(--paid)} .stamp.late{color:var(--late)}
+.stamp.big{position:static;display:inline-block;font-size:20px;padding:5px 12px;border-width:3px;transform:rotate(-5deg);margin:4px 0 8px}
+@media (prefers-reduced-motion:no-preference){
+  .stamp.pop{animation:thump .35s ease-out}
+  @keyframes thump{0%{transform:rotate(-5deg) scale(1.8);opacity:0}70%{transform:rotate(-5deg) scale(.95);opacity:1}100%{transform:rotate(-5deg) scale(1)}}
+}
+
+.empty{padding:28px 16px;text-align:center;color:var(--ink-2);background:var(--sheet);border:1px dashed var(--rule);border-radius:10px}
+.empty strong{display:block;color:var(--ink);font-size:17px;margin-bottom:4px}
+
+/* bouton principal */
+.fab{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:5;display:flex;align-items:center;gap:10px;background:var(--ink);color:var(--sheet);border:0;border-radius:999px;padding:14px 22px;font-family:var(--head);font-weight:700;font-size:18px;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+.fab svg{width:22px;height:22px}
+
+/* feuille modale */
+.sheet{position:fixed;inset:0;z-index:10;background:var(--paper);overflow-y:auto;-webkit-overflow-scrolling:touch;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.sheet[hidden]{display:none}
+#formSheet{z-index:12}
+.sheet .bar{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:8px;background:var(--paper);padding:10px 12px;border-bottom:1px solid var(--rule)}
+.sheet .bar h2{flex:1;margin:0;font-family:var(--head);font-size:21px;font-weight:700}
+.sheet .body{max-width:720px;margin:0 auto;padding:16px}
+.iconbtn{background:none;border:0;padding:8px;border-radius:8px;display:grid;place-items:center;color:var(--ink)}
+.iconbtn svg{width:24px;height:24px}
+
+label.lbl,.lbl{display:block;font-weight:700;font-size:15px;margin:16px 0 6px}
+input[type=text],input[type=number],input[type=date],textarea,select.inp{width:100%;padding:12px;border:1px solid var(--rule);border-radius:8px;background:var(--field);min-height:46px}
+textarea{min-height:72px;resize:vertical}
+.seg{display:grid;gap:6px}
+.seg.two{grid-template-columns:1fr 1fr}
+.seg.four{grid-template-columns:1fr 1fr}
+.seg button{padding:11px 8px;border:1px solid var(--rule);border-radius:8px;background:var(--field);font-size:15px;text-align:center;line-height:1.2}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--sheet);border-color:var(--ink);font-weight:700}
+.row{display:flex;gap:10px}
+.row>*{flex:1;min-width:0}
+
+.photos{display:flex;gap:8px;flex-wrap:wrap}
+.ph{position:relative;width:92px;height:120px;border-radius:6px;border:1px solid var(--rule);background:var(--sheet) center/cover no-repeat;display:grid;place-items:center;color:var(--ink-2);font-size:13px;text-align:center}
+.ph .x{position:absolute;top:-8px;right:-8px;width:28px;height:28px;border-radius:50%;border:0;background:var(--late);color:#fff;font-weight:700;line-height:28px;padding:0}
+.addph{position:relative;overflow:hidden;cursor:pointer;width:92px;height:120px;border:2px dashed var(--rule);border-radius:6px;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--ink);font-size:13px;padding:4px}
+.addph svg{width:26px;height:26px}
+.fileov{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:0}
+.hint{font-size:13px;color:var(--ink-2);margin-top:6px}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:8px;padding:12px 16px;border:1px solid var(--ink);background:var(--ink);color:var(--sheet);font-weight:700;min-height:48px}
+.btn.ghost{background:transparent;color:var(--ink)}
+.btn.danger{background:transparent;color:var(--late);border-color:var(--late)}
+.btn.sent{background:var(--sent);border-color:var(--sent);color:#fff}
+.btn.paid{background:var(--paid);border-color:var(--paid);color:#fff}
+.btn.block{width:100%}
+.btn:disabled{opacity:.5}
+.actions{display:flex;flex-direction:column;gap:10px;margin-top:22px}
+
+/* détail */
+.timeline{list-style:none;margin:16px 0 0;padding:0;border-left:2px solid var(--rule)}
+.timeline li{position:relative;padding:0 0 14px 18px}
+.timeline li::before{content:"";position:absolute;left:-7px;top:5px;width:12px;height:12px;border-radius:50%;background:var(--paper);border:2px solid var(--rule)}
+.timeline li.done::before{background:var(--ink);border-color:var(--ink)}
+.timeline .t{font-weight:700}
+.timeline .d{color:var(--ink-2);font-size:14px}
+.dl{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:12px 0 0;font-size:15px}
+.dl dt{color:var(--ink-2)} .dl dd{margin:0;font-weight:700}
+.inline-form{margin-top:12px;padding:12px;border:1px solid var(--rule);border-radius:10px;background:var(--sheet)}
+.inline-form[hidden]{display:none}
+
+/* bilan */
+.tablewrap{overflow-x:auto;border:1px solid var(--rule);border-radius:10px;background:var(--sheet);margin-top:8px}
+table{border-collapse:collapse;width:100%;font-size:15px;min-width:460px}
+th,td{padding:10px 12px;text-align:right;border-bottom:1px solid var(--rule);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+thead th{font-family:var(--head);font-size:16px;font-weight:600;color:var(--ink-2)}
+tbody tr:last-child td{border-bottom:0}
+tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
+h2.sec{font-family:var(--head);font-size:22px;margin:22px 0 4px}
+
+/* visionneuse */
+.viewer{position:fixed;inset:0;z-index:20;background:#000;overflow:auto;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.viewer[hidden]{display:none}
+.viewer img{display:block;width:100%;height:auto;min-height:40vh;object-fit:contain}
+.viewer.zoom img{width:220%;max-width:none}
+.viewer .close{position:fixed;top:calc(10px + env(safe-area-inset-top,0px));right:10px;z-index:2;background:rgba(255,255,255,.9);color:#000;border:0;border-radius:999px;padding:8px 14px;font-weight:700}
+.viewer .vhint{position:fixed;bottom:calc(12px + env(safe-area-inset-bottom,0px));left:0;right:0;text-align:center;color:#ddd;font-size:13px}
+
+.toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:30;background:var(--ink);color:var(--sheet);padding:10px 16px;border-radius:8px;font-size:15px;max-width:90vw;text-align:center}
+.toast[hidden]{display:none}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+/* connexion */
+.login{position:fixed;inset:0;z-index:40;background:var(--paper);overflow-y:auto;padding:calc(24px + env(safe-area-inset-top,0px)) 20px calc(24px + env(safe-area-inset-bottom,0px))}
+.login[hidden]{display:none}
+.login .box{max-width:420px;margin:8vh auto 0}
+.login .err{color:var(--late);font-weight:700;min-height:1.4em;margin-top:10px}
+.linkbtn{background:none;border:0;color:var(--sent);text-decoration:underline;padding:8px 0;font-size:15px}
+.splash{position:fixed;inset:0;z-index:50;background:var(--paper);display:grid;place-items:center;color:var(--ink-2)}
+.splash[hidden]{display:none}
+</style>
+</head>
+<body>
+<div class="splash" id="splash">Chargement…</div>
+<section class="login" id="login" hidden>
+  <div class="box">
+    <h1>Feuilles de soins</h1>
+    <p class="sub">Famille Dubois · connexion</p>
+    <label class="lbl" for="lgEmail">Email</label>
+    <input type="text" id="lgEmail" inputmode="email" autocomplete="username" autocapitalize="off" spellcheck="false">
+    <label class="lbl" for="lgPass">Mot de passe</label>
+    <input type="password" id="lgPass" autocomplete="current-password" style="width:100%;padding:12px;border:1px solid var(--rule);border-radius:8px;background:var(--field);min-height:46px">
+    <div class="actions"><button class="btn block" id="lgGo" type="button">Se connecter</button></div>
+    <div class="err" id="lgErr" role="alert"></div>
+    <button class="linkbtn" id="lgReset" type="button">Mot de passe oublié ?</button>
+  </div>
+</section>
+<div class="wrap">
+  <header class="top">
+    <h1>Feuilles de soins</h1>
+    <p class="sub">Famille Dubois · CNMSS et CPS</p>
+  </header>
+  <div class="banner" id="banner" hidden></div>
+
+  <div class="summary" id="summary"></div>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" aria-selected="true" data-tab="liste">Feuilles</button>
+    <button role="tab" aria-selected="false" data-tab="bilan">Bilan</button>
+  </nav>
+
+  <section id="tab-liste">
+    <div class="chips" id="chips"></div>
+    <div class="filters">
+      <select id="fBenef" aria-label="Bénéficiaire"></select>
+      <select id="fOrg" aria-label="Organisme"></select>
+    </div>
+    <div class="list" id="list"></div>
+  </section>
+
+  <section id="tab-bilan" hidden></section>
+</div>
+
+<button class="fab" id="fab" type="button">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+  Scanner une feuille
+</button>
+
+<!-- Formulaire nouvelle / modification -->
+<div class="sheet" id="formSheet" hidden role="dialog" aria-modal="true" aria-labelledby="formTitle">
+  <div class="bar">
+    <button class="iconbtn" id="formClose" aria-label="Fermer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <h2 id="formTitle">Nouvelle feuille</h2>
+  </div>
+  <div class="body">
+    <span class="lbl">Photos de la feuille</span>
+    <div class="photos" id="formPhotos"></div>
+    <p class="hint">Photographie la feuille à plat, bien éclairée. Tu peux ajouter l'ordonnance aussi.</p>
+
+    <span class="lbl" id="lblBenef">Bénéficiaire</span>
+    <div class="seg four" id="segBenef" role="group" aria-labelledby="lblBenef"></div>
+
+    <span class="lbl" id="lblOrg">Envoyée à</span>
+    <div class="seg two" id="segOrg" role="group" aria-labelledby="lblOrg"></div>
+
+    <div class="row">
+      <div>
+        <label class="lbl" for="inDateSoins">Date des soins</label>
+        <input type="date" id="inDateSoins">
+      </div>
+      <div>
+        <label class="lbl" for="inMontant" id="lblMontant">Montant payé</label>
+        <input type="number" id="inMontant" inputmode="decimal" step="any" min="0" placeholder="0">
+      </div>
+    </div>
+
+    <label class="lbl" for="inPraticien">Praticien ou soin</label>
+    <input type="text" id="inPraticien" placeholder="Ex. Dr Tetuanui, pharmacie, kiné…" autocomplete="off">
+
+    <span class="lbl" id="lblEtat">Déjà envoyée ?</span>
+    <div class="seg two" id="segEtat" role="group" aria-labelledby="lblEtat">
+      <button type="button" data-v="a_envoyer">Pas encore</button>
+      <button type="button" data-v="envoyee">Oui, envoyée</button>
+    </div>
+    <div id="rowDateEnvoi" hidden>
+      <label class="lbl" for="inDateEnvoi">Date d'envoi</label>
+      <input type="date" id="inDateEnvoi">
+    </div>
+
+    <label class="lbl" for="inNotes">Notes</label>
+    <textarea id="inNotes" placeholder="N° de bordereau, remarque…"></textarea>
+
+    <div class="actions">
+      <button class="btn block" id="formSave" type="button">Enregistrer la feuille</button>
+    </div>
+  </div>
+</div>
+
+<!-- Détail -->
+<div class="sheet" id="detailSheet" hidden role="dialog" aria-modal="true" aria-labelledby="detailTitle">
+  <div class="bar">
+    <button class="iconbtn" id="detailClose" aria-label="Retour"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <h2 id="detailTitle">Feuille</h2>
+    <button class="iconbtn" id="detailEdit" aria-label="Modifier"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg></button>
+  </div>
+  <div class="body" id="detailBody"></div>
+</div>
+
+<div class="viewer" id="viewer" hidden>
+  <button class="close" id="viewerClose">Fermer</button>
+  <img id="viewerImg" alt="Feuille de soins">
+  <div class="vhint">Touche l'image pour zoomer</div>
+</div>
+
+<div class="toast" id="toast" hidden role="status"></div>
+
+<script src="config.js"></script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, doc, setDoc, deleteDoc, getDoc, getDocs, onSnapshot } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+const BENEFS = ["Dubois Jean-Louis","Bernard Vanessa","Dubois Matys","Dubois Maëline"];
+const ORGS = ["CNMSS","CPS"];
+const STATUS = {
+  todo:{label:"À envoyer", cls:"todo"}, sent:{label:"Envoyée", cls:"sent"},
+  late:{label:"À relancer", cls:"late"}, paid:{label:"Remboursée", cls:"paid"}
+};
+const S = { ready:false, user:null, feuilles:[], settings:{delai:45, devise:"XPF"}, filter:{st:"attente", benef:"", org:""}, tab:"liste", openId:null, form:null, unsub:[] };
+const $ = s => document.querySelector(s);
+const esc = s => String(s==null?"":s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+
+/* ---------- Firebase ---------- */
+let app, auth, db;
+try{
+  app = initializeApp(window.FIREBASE_CONFIG);
+  auth = getAuth(app);
+  try{ db = initializeFirestore(app, {localCache: persistentLocalCache({tabManager: persistentMultipleTabManager()})}); }
+  catch(e){ db = initializeFirestore(app, {}); }
+}catch(e){
+  $("#splash").textContent = "Configuration Firebase introuvable ou invalide (fichier config.js).";
+  throw e;
+}
+
+/* ---------- dates & montants ---------- */
+function todayISO(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function fmtDate(iso){ if(!iso) return "—"; const [y,m,d]=iso.split("-"); return d+"/"+m+"/"+y; }
+function daysSince(iso){ if(!iso) return 0; const [y,m,d]=iso.split("-").map(Number); const a=new Date(y,m-1,d); const t=new Date(); t.setHours(0,0,0,0); return Math.round((t-a)/86400000); }
+function money(n){
+  if(n===""||n==null||isNaN(n)) return "—";
+  if(S.settings.devise==="EUR") return Number(n).toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2})+" €";
+  return Math.round(Number(n)).toLocaleString("fr-FR")+" XPF";
+}
+function status(f){
+  if(f.statut==="remboursee") return "paid";
+  if(f.statut==="envoyee") return daysSince(f.dateEnvoi) > Number(S.settings.delai||45) ? "late" : "sent";
+  return "todo";
+}
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
+
+/* Écrit dans la base : l'écran avance tout de suite (le cache local garde la donnée hors connexion),
+   et une erreur éventuelle du serveur est signalée ensuite. */
+async function write(p){ p.catch(saveError); await Promise.race([p, sleep(1200)]); }
+
+/* ---------- stockage ---------- */
+const Store = {
+  async saveFeuille(f){
+    const body = Object.assign({}, f); delete body.id; body.updatedAt = new Date().toISOString();
+    body.updatedBy = S.user ? S.user.email : "";
+    await write(setDoc(doc(db,"feuilles",f.id), body));
+  },
+  async deleteFeuille(f){
+    for(const sc of (f.scans||[])) Store.deleteScan(sc);
+    await write(deleteDoc(doc(db,"feuilles",f.id)));
+  },
+  async saveSettings(st){ await write(setDoc(doc(db,"reglages","general"), st)); },
+  async addScan(file){
+    const dataUrl = await compressToLimit(file, 800000);
+    const id = uid();
+    scanCache[id] = dataUrl;
+    await write(setDoc(doc(db,"scans",id), {img:dataUrl, createdAt:new Date().toISOString()}));
+    return {d:id};
+  },
+  deleteScan(sc){ if(sc && sc.d) deleteDoc(doc(db,"scans",sc.d)).catch(()=>{}); }
+};
+const scanCache = {};
+async function scanURL(sc){
+  if(!sc || !sc.d) return null;
+  if(scanCache[sc.d]) return scanCache[sc.d];
+  const s = await getDoc(doc(db,"scans",sc.d));
+  const v = s.exists() ? s.data().img : null;
+  if(v) scanCache[sc.d]=v;
+  return v;
+}
+
+/* ---------- images ---------- */
+function loadImg(file){ return new Promise((res,rej)=>{ const u=URL.createObjectURL(file); const i=new Image(); i.onload=()=>res(i); i.onerror=()=>rej(new Error("image")); i.src=u; }); }
+function drawTo(img, max){
+  const r=Math.min(1, max/Math.max(img.naturalWidth,img.naturalHeight));
+  const c=document.createElement("canvas"); c.width=Math.round(img.naturalWidth*r); c.height=Math.round(img.naturalHeight*r);
+  const g=c.getContext("2d"); g.fillStyle="#fff"; g.fillRect(0,0,c.width,c.height); g.drawImage(img,0,0,c.width,c.height); return c;
+}
+async function compressToLimit(file, limit){
+  const img=await loadImg(file);
+  const tries=[[2000,.78],[1800,.72],[1600,.68],[1400,.62],[1200,.58],[1000,.55]];
+  let out="";
+  for(const [m,q] of tries){ out=drawTo(img,m).toDataURL("image/jpeg",q); if(out.length<=limit) return out; }
+  return out;
+}
+
+/* ---------- rendu ---------- */
+function visible(){
+  const f=S.filter;
+  return S.feuilles.filter(x=>{
+    const st=status(x);
+    if(f.st==="attente" && !(st==="sent"||st==="late")) return false;
+    if(f.st==="todo" && st!=="todo") return false;
+    if(f.st==="late" && st!=="late") return false;
+    if(f.st==="paid" && st!=="paid") return false;
+    if(f.benef && x.beneficiaire!==f.benef) return false;
+    if(f.org && x.organisme!==f.org) return false;
+    return true;
+  }).sort((a,b)=>{
+    const ka = a.statut==="envoyee" ? a.dateEnvoi : (a.dateSoins||"");
+    const kb = b.statut==="envoyee" ? b.dateEnvoi : (b.dateSoins||"");
+    if(S.filter.st==="attente"||S.filter.st==="late") return (ka||"").localeCompare(kb||"");
+    return (kb||"").localeCompare(ka||"");
+  });
+}
+function renderSummary(){
+  let todo=0, wait=0, late=0, waitAmt=0;
+  S.feuilles.forEach(f=>{ const s=status(f); if(s==="todo") todo++; if(s==="sent"||s==="late"){ wait++; waitAmt+=Number(f.montant)||0; } if(s==="late") late++; });
+  const cell=(k,cls,n,label)=>`<button class="sum ${cls}" data-sum="${k}" aria-pressed="${S.filter.st===k}"><b>${n}</b><span>${label}</span></button>`;
+  $("#summary").innerHTML = cell("todo","todo",todo,"à envoyer") + cell("attente","sent",wait,"en attente<br>"+money(waitAmt)) + cell("late","late",late,"à relancer<br>(+"+S.settings.delai+" j)");
+}
+function renderChips(){
+  const opts=[["attente","En attente"],["todo","À envoyer"],["late","À relancer"],["paid","Remboursées"],["all","Toutes"]];
+  $("#chips").innerHTML = opts.map(([k,l])=>`<button class="chip" data-st="${k}" aria-pressed="${S.filter.st===k}">${l}</button>`).join("");
+}
+function renderFilters(){
+  $("#fBenef").innerHTML = `<option value="">Tous les bénéficiaires</option>`+BENEFS.map(b=>`<option ${S.filter.benef===b?"selected":""}>${esc(b)}</option>`).join("");
+  $("#fOrg").innerHTML = `<option value="">CNMSS et CPS</option>`+ORGS.map(o=>`<option ${S.filter.org===o?"selected":""}>${o}</option>`).join("");
+}
+function firstName(b){ return (b||"").split(" ").slice(1).join(" ")||b; }
+function renderList(){
+  const el=$("#list");
+  if(!S.ready){ el.innerHTML=`<div class="empty">Chargement des feuilles…</div>`; return; }
+  const v=visible();
+  if(!v.length){
+    el.innerHTML = `<div class="empty">${S.feuilles.length ? `<strong>Aucune feuille dans ce filtre</strong>Change de filtre ou scanne une nouvelle feuille.` : `<strong>Aucune feuille pour l'instant</strong>Touche « Scanner une feuille » pour photographier la première.`}</div>`;
+    return;
+  }
+  el.innerHTML = v.map(f=>{
+    const st=status(f), S2=STATUS[st];
+    let when="";
+    if(st==="todo") when=`Soins du ${fmtDate(f.dateSoins)}`;
+    else if(st==="paid") when=`Remboursée le ${fmtDate(f.dateRemb)}`+(f.montantRemb!==""&&f.montantRemb!=null?` · ${money(f.montantRemb)}`:"");
+    else when=`Envoyée le ${fmtDate(f.dateEnvoi)} · il y a ${daysSince(f.dateEnvoi)} j`;
+    const th = (f.scans&&f.scans.length) ? `<span class="thumb" data-thumb="${f.id}">…</span>` : `<span class="thumb">Pas de photo</span>`;
+    return `<button class="card s-${S2.cls}" data-open="${f.id}">
+      ${th}
+      <span><h3>${esc(firstName(f.beneficiaire))} · ${esc(f.organisme)}</h3>
+      <div class="meta">${esc(f.praticien||"Soin")} · ${fmtDate(f.dateSoins)}</div>
+      <div class="amt">${money(f.montant)}</div>
+      <div class="when ${st==="late"?"late":""}">${when}</div></span>
+      <span class="stamp ${S2.cls}">${S2.label}</span>
+    </button>`;
+  }).join("");
+  v.forEach(f=>{ if(f.scans&&f.scans.length){ scanURL(f.scans[0]).then(u=>{ const t=document.querySelector(`[data-thumb="${f.id}"]`); if(t&&u){ t.style.backgroundImage=`url("${u}")`; t.textContent=""; } }).catch(()=>{}); } });
+}
+function renderBilan(){
+  const years=[...new Set(S.feuilles.map(f=>(f.dateSoins||"").slice(0,4)).filter(Boolean))].sort().reverse();
+  const cur = S.bilanYear || years[0] || String(new Date().getFullYear());
+  const rows = S.feuilles.filter(f=>(f.dateSoins||"").startsWith(cur));
+  const agg = key => { const m={}; rows.forEach(f=>{ const k=f[key]; m[k]=m[k]||{n:0,paye:0,remb:0,att:0}; m[k].n++; m[k].paye+=Number(f.montant)||0; if(f.statut==="remboursee") m[k].remb+=Number(f.montantRemb)||0; else m[k].att+=Number(f.montant)||0; }); return m; };
+  const table = (m, order, title) => {
+    let tot={n:0,paye:0,remb:0,att:0};
+    const body = order.filter(k=>m[k]).map(k=>{ const r=m[k]; tot.n+=r.n; tot.paye+=r.paye; tot.remb+=r.remb; tot.att+=r.att;
+      return `<tr><td>${esc(k)}</td><td>${r.n}</td><td>${money(r.paye)}</td><td>${money(r.remb)}</td><td>${money(r.att)}</td></tr>`; }).join("");
+    if(!body) return `<p class="hint">Aucune feuille en ${cur}.</p>`;
+    return `<div class="tablewrap"><table><thead><tr><th>${title}</th><th>Feuilles</th><th>Payé</th><th>Remboursé</th><th>Non remboursé</th></tr></thead><tbody>${body}</tbody>
+      <tfoot><tr><td>Total</td><td>${tot.n}</td><td>${money(tot.paye)}</td><td>${money(tot.remb)}</td><td>${money(tot.att)}</td></tr></tfoot></table></div>`;
+  };
+  $("#tab-bilan").innerHTML = `
+    <label class="lbl" for="bYear">Année des soins</label>
+    <select class="inp" id="bYear">${(years.length?years:[cur]).map(y=>`<option ${y===cur?"selected":""}>${y}</option>`).join("")}</select>
+    <h2 class="sec">Par bénéficiaire</h2>${table(agg("beneficiaire"), BENEFS, "Bénéficiaire")}
+    <h2 class="sec">Par organisme</h2>${table(agg("organisme"), ORGS, "Organisme")}
+    <p class="hint">« Non remboursé » compte le montant payé des feuilles pas encore remboursées.</p>
+    <h2 class="sec">Exporter et sauvegarder</h2>
+    <div class="actions" style="margin-top:8px">
+      <button class="btn ghost block" id="btnExport" type="button">Exporter la liste (CSV pour Excel)</button>
+      <button class="btn ghost block" id="btnBackup" type="button">Sauvegarde complète avec photos (.json)</button>
+      <label class="btn ghost block" style="position:relative;overflow:hidden">Importer une sauvegarde (.json)
+        <input type="file" accept="application/json,.json" data-import="1" style="position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer"></label>
+    </div>
+    <p class="hint" id="impStatus"></p>
+    <h2 class="sec">Réglages</h2>
+    <div class="row">
+      <div><label class="lbl" for="sDelai">Relancer après (jours)</label><input type="number" id="sDelai" min="1" inputmode="numeric" value="${esc(S.settings.delai)}"></div>
+      <div><label class="lbl" for="sDev">Devise</label><select class="inp" id="sDev"><option value="XPF" ${S.settings.devise!=="EUR"?"selected":""}>XPF</option><option value="EUR" ${S.settings.devise==="EUR"?"selected":""}>Euro</option></select></div>
+    </div>
+    <button class="btn block" id="btnSettings" type="button" style="margin-top:12px">Enregistrer les réglages</button>
+    <h2 class="sec">Compte</h2>
+    <p class="hint" style="font-size:15px">Connecté : <b>${esc(S.user?S.user.email:"")}</b></p>
+    <button class="btn danger block" id="btnLogout" type="button">Se déconnecter</button>`;
+}
+function renderAll(){
+  renderSummary(); renderChips(); renderFilters(); renderList();
+  if(S.tab==="bilan") renderBilan();
+  if(S.openId && !$("#detailSheet").hidden) renderDetail();
+}
+
+/* ---------- détail ---------- */
+function openDetail(id){ S.openId=id; renderDetail(); $("#detailSheet").hidden=false; document.body.style.overflow="hidden"; }
+function closeDetail(){ $("#detailSheet").hidden=true; S.openId=null; document.body.style.overflow=""; }
+function renderDetail(stampPop){
+  const f=S.feuilles.find(x=>x.id===S.openId); if(!f){ closeDetail(); return; }
+  const st=status(f), S2=STATUS[st];
+  $("#detailTitle").textContent = firstName(f.beneficiaire)+" · "+f.organisme;
+  const tl = `<ol class="timeline">
+    <li class="done"><div class="t">Soins</div><div class="d">${fmtDate(f.dateSoins)} · ${money(f.montant)} payé</div></li>
+    <li class="${f.statut!=="a_envoyer"?"done":""}"><div class="t">Envoyée à la ${esc(f.organisme)}</div><div class="d">${f.dateEnvoi&&f.statut!=="a_envoyer"?fmtDate(f.dateEnvoi)+(f.statut==="envoyee"?" · il y a "+daysSince(f.dateEnvoi)+" jours":""):"Pas encore"}</div></li>
+    <li class="${f.statut==="remboursee"?"done":""}"><div class="t">Remboursement reçu</div><div class="d">${f.statut==="remboursee"?fmtDate(f.dateRemb)+" · "+money(f.montantRemb):"En attente"}</div></li>
+  </ol>`;
+  let act="";
+  if(f.statut==="a_envoyer"){
+    act=`<button class="btn sent block" data-act="showSend">Marquer comme envoyée</button>
+      <div class="inline-form" id="fSend" hidden><label class="lbl" for="dSend" style="margin-top:0">Date d'envoi</label><input type="date" id="dSend" value="${todayISO()}">
+      <button class="btn sent block" data-act="doSend" style="margin-top:10px">Confirmer l'envoi</button></div>`;
+  } else if(f.statut==="envoyee"){
+    act=`<button class="btn paid block" data-act="showPaid">J'ai reçu le remboursement</button>
+      <div class="inline-form" id="fPaid" hidden>
+        <div class="row"><div><label class="lbl" for="dPaid" style="margin-top:0">Date du remboursement</label><input type="date" id="dPaid" value="${todayISO()}"></div>
+        <div><label class="lbl" for="mPaid" style="margin-top:0">Montant remboursé</label><input type="number" id="mPaid" step="any" min="0" inputmode="decimal" placeholder="${esc(f.montant||0)}"></div></div>
+        <button class="btn paid block" data-act="doPaid" style="margin-top:10px">Confirmer le remboursement</button></div>
+      <button class="btn ghost block" data-act="undoSend">Annuler l'envoi</button>`;
+  } else {
+    act=`<button class="btn ghost block" data-act="undoPaid">Annuler le remboursement</button>`;
+  }
+  $("#detailBody").innerHTML = `
+    <span class="stamp big ${S2.cls} ${stampPop?"pop":""}">${S2.label}</span>
+    <div class="photos" id="detPhotos">${(f.scans||[]).map((sc,i)=>`<button class="ph" data-view="${i}" aria-label="Voir la photo ${i+1}">…</button>`).join("") || `<span class="hint">Aucune photo.</span>`}</div>
+    <dl class="dl">
+      <dt>Bénéficiaire</dt><dd>${esc(f.beneficiaire)}</dd>
+      <dt>Organisme</dt><dd>${esc(f.organisme)}</dd>
+      <dt>Praticien</dt><dd>${esc(f.praticien||"—")}</dd>
+      ${f.notes?`<dt>Notes</dt><dd style="font-weight:400;white-space:pre-wrap">${esc(f.notes)}</dd>`:""}
+      ${f.updatedBy?`<dt>Modifiée par</dt><dd style="font-weight:400">${esc(f.updatedBy)}</dd>`:""}
+    </dl>
+    ${tl}
+    <div class="actions">${act}
+      <button class="btn danger block" data-act="delete">Supprimer la feuille</button>
+    </div>`;
+  (f.scans||[]).forEach((sc,i)=>{ scanURL(sc).then(u=>{ const b=document.querySelector(`#detPhotos [data-view="${i}"]`); if(b&&u){ b.style.backgroundImage=`url("${u}")`; b.textContent=""; b.dataset.src=u; } }).catch(()=>{}); });
+}
+async function detailAction(a){
+  const f=S.feuilles.find(x=>x.id===S.openId); if(!f) return;
+  const upd = async (patch, msg, pop) => { Object.assign(f, patch); await Store.saveFeuille(f); renderDetail(pop); renderSummary(); renderList(); toast(msg); };
+  if(a==="showSend"){ $("#fSend").hidden=false; return; }
+  if(a==="showPaid"){ $("#fPaid").hidden=false; $("#mPaid").focus(); return; }
+  if(a==="doSend") return upd({statut:"envoyee", dateEnvoi:$("#dSend").value||todayISO()}, "Feuille marquée comme envoyée.", true);
+  if(a==="doPaid"){ const m=$("#mPaid").value; return upd({statut:"remboursee", dateRemb:$("#dPaid").value||todayISO(), montantRemb: m===""?"":Number(m)}, "Remboursement enregistré.", true); }
+  if(a==="undoSend") return upd({statut:"a_envoyer", dateEnvoi:""}, "Envoi annulé.");
+  if(a==="undoPaid") return upd({statut:"envoyee", dateRemb:"", montantRemb:""}, "Remboursement annulé.");
+  if(a==="delete"){
+    if(!confirm("Supprimer cette feuille et ses photos ? C'est définitif.")) return;
+    await Store.deleteFeuille(f); closeDetail(); toast("Feuille supprimée.");
+  }
+}
+
+/* ---------- formulaire ---------- */
+function openForm(f){
+  S.form = f ? JSON.parse(JSON.stringify(f)) : {id:uid(), beneficiaire:"", organisme:"", dateSoins:todayISO(), montant:"", praticien:"", statut:"a_envoyer", dateEnvoi:"", dateRemb:"", montantRemb:"", notes:"", scans:[], createdAt:new Date().toISOString()};
+  S.form._isNew=!f; S.form._added=[]; S.form._removed=[]; S.form._busy=0;
+  $("#formTitle").textContent = f ? "Modifier la feuille" : "Nouvelle feuille";
+  $("#inDateSoins").value=S.form.dateSoins||""; $("#inMontant").value=S.form.montant; $("#inPraticien").value=S.form.praticien||""; $("#inNotes").value=S.form.notes||"";
+  $("#inDateEnvoi").value=S.form.dateEnvoi||todayISO();
+  $("#lblMontant").textContent = "Montant payé ("+(S.settings.devise==="EUR"?"€":"XPF")+")";
+  $("#segEtat").hidden = S.form.statut==="remboursee"; $("#lblEtat").hidden = S.form.statut==="remboursee";
+  renderFormSegs(); renderFormPhotos();
+  $("#formSheet").hidden=false; document.body.style.overflow="hidden";
+}
+function renderFormSegs(){
+  const F=S.form;
+  $("#segBenef").innerHTML = BENEFS.map(b=>`<button type="button" data-b="${esc(b)}" aria-pressed="${F.beneficiaire===b}">${esc(b)}</button>`).join("");
+  $("#segOrg").innerHTML = ORGS.map(o=>`<button type="button" data-o="${o}" aria-pressed="${F.organisme===o}">${o}</button>`).join("");
+  $("#segEtat").querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed", String((F.statut==="a_envoyer"?"a_envoyer":"envoyee")===b.dataset.v)));
+  $("#rowDateEnvoi").hidden = F.statut!=="envoyee";
+}
+function renderFormPhotos(){
+  const F=S.form;
+  const ph = F.scans.map((sc,i)=>`<div class="ph" data-fi="${i}">…<button type="button" class="x" data-rm="${i}" aria-label="Retirer la photo">×</button></div>`).join("");
+  const busy = F._busy ? `<div class="ph">Envoi…</div>` : "";
+  $("#formPhotos").innerHTML = ph + busy +
+    `<label class="addph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Prendre une photo<input type="file" class="fileov" data-file="cam" accept="image/*" capture="environment" aria-label="Prendre une photo"></label>
+     <label class="addph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 16l5-5 4 4 3-3 6 6"/></svg>Depuis la galerie<input type="file" class="fileov" data-file="gal" accept="image/*" multiple aria-label="Choisir dans la galerie"></label>`;
+  F.scans.forEach((sc,i)=>scanURL(sc).then(u=>{ const d=document.querySelector(`#formPhotos [data-fi="${i}"]`); if(d&&u){ d.style.backgroundImage=`url("${u}")`; d.firstChild.textContent=""; } }).catch(()=>{}));
+}
+async function addFiles(files){
+  const F=S.form; if(!F) return;
+  for(const file of files){
+    if(!file.type.startsWith("image/")){ toast("Seules les photos sont acceptées."); continue; }
+    F._busy++; renderFormPhotos();
+    try{ const sc=await Store.addScan(file); if(S.form!==F){ Store.deleteScan(sc); return; } F.scans.push(sc); F._added.push(sc); }
+    catch(e){ toast("La photo n'a pas pu être enregistrée. Réessaie."); }
+    F._busy--; if(S.form===F) renderFormPhotos();
+  }
+}
+function closeForm(discard){
+  const F=S.form;
+  if(discard && F){ F._added.forEach(sc=>Store.deleteScan(sc)); }
+  S.form=null; $("#formSheet").hidden=true; if($("#detailSheet").hidden) document.body.style.overflow="";
+}
+async function saveForm(){
+  const F=S.form;
+  if(F._busy){ toast("Attends la fin de l'enregistrement des photos."); return; }
+  F.dateSoins=$("#inDateSoins").value; F.praticien=$("#inPraticien").value.trim(); F.notes=$("#inNotes").value.trim();
+  const m=$("#inMontant").value; F.montant = m===""?"":Number(m);
+  if(F.statut==="envoyee") F.dateEnvoi=$("#inDateEnvoi").value||todayISO();
+  if(F.statut==="a_envoyer") F.dateEnvoi="";
+  if(!F.beneficiaire){ toast("Choisis le bénéficiaire."); return; }
+  if(!F.organisme){ toast("Choisis CNMSS ou CPS."); return; }
+  if(!F.dateSoins){ toast("Indique la date des soins."); return; }
+  const out=Object.assign({}, F); ["_isNew","_added","_removed","_busy"].forEach(k=>delete out[k]);
+  $("#formSave").disabled=true;
+  await Store.saveFeuille(out);
+  F._removed.forEach(sc=>Store.deleteScan(sc));
+  const wasNew=F._isNew; closeForm(false);
+  toast(wasNew?"Feuille enregistrée.":"Modifications enregistrées.");
+  $("#formSave").disabled=false;
+}
+
+/* ---------- export, sauvegarde, import ---------- */
+function download(name, text, type){
+  const blob=new Blob([text],{type}); const u=URL.createObjectURL(blob);
+  const a=document.createElement("a"); a.href=u; a.download=name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(u), 4000);
+}
+function buildCSV(){
+  const head=["Bénéficiaire","Organisme","Date des soins","Praticien ou soin","Montant payé","Statut","Date d'envoi","Jours depuis l'envoi","Date du remboursement","Montant remboursé","Notes","Devise"];
+  const q=v=>{ const s=String(v==null?"":v); return /[;"\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
+  const num=v=> v===""||v==null ? "" : String(v).replace(".",",");
+  const rows=S.feuilles.slice().sort((a,b)=>(a.dateSoins||"").localeCompare(b.dateSoins||"")).map(f=>[
+    f.beneficiaire,f.organisme,fmtDate(f.dateSoins),f.praticien,num(f.montant),STATUS[status(f)].label,
+    f.statut!=="a_envoyer"?fmtDate(f.dateEnvoi):"", f.statut==="envoyee"?daysSince(f.dateEnvoi):"",
+    f.statut==="remboursee"?fmtDate(f.dateRemb):"", f.statut==="remboursee"?num(f.montantRemb):"", f.notes, S.settings.devise]);
+  return "\uFEFF"+[head].concat(rows).map(r=>r.map(q).join(";")).join("\r\n");
+}
+async function doBackup(){
+  const st=$("#impStatus"); st.textContent="Préparation de la sauvegarde…";
+  const out={format:"feuilles-de-soins-dubois",version:1,settings:S.settings,feuilles:[],scans:{}};
+  for(const f of S.feuilles){
+    out.feuilles.push(Object.assign({}, f));
+    for(const sc of (f.scans||[])){ const u=await scanURL(sc).catch(()=>null); if(u) out.scans[sc.d]=u; }
+  }
+  download("sauvegarde-feuilles-de-soins-"+todayISO()+".json", JSON.stringify(out), "application/json");
+  st.textContent="Sauvegarde téléchargée ("+out.feuilles.length+" feuilles).";
+}
+async function doImport(file){
+  const st=$("#impStatus");
+  let data;
+  try{ data=JSON.parse(await file.text()); }catch(e){ st.textContent="Ce fichier n'est pas une sauvegarde valide."; return; }
+  if(!data || data.format!=="feuilles-de-soins-dubois" || !Array.isArray(data.feuilles)){ st.textContent="Ce fichier n'est pas une sauvegarde de cette application."; return; }
+  if(!confirm(`Importer ${data.feuilles.length} feuille(s) ? Les feuilles déjà présentes avec le même identifiant seront remplacées.`)) return;
+  let n=0, errors=0;
+  for(const f of data.feuilles){
+    st.textContent=`Import en cours… ${n}/${data.feuilles.length}`;
+    try{
+      for(const sc of (f.scans||[])){ if(sc.d && data.scans && data.scans[sc.d]) await setDoc(doc(db,"scans",sc.d), {img:data.scans[sc.d], createdAt:new Date().toISOString()}); }
+      const body=Object.assign({}, f); const id=body.id; delete body.id;
+      body.scans=(f.scans||[]).filter(sc=>sc.d);
+      await setDoc(doc(db,"feuilles",id), body);
+      n++;
+    }catch(e){ errors++; console.error(e); }
+  }
+  if(data.settings && data.settings.delai) await setDoc(doc(db,"reglages","general"), data.settings).catch(()=>{});
+  st.textContent = errors ? `Import terminé : ${n} feuille(s) importée(s), ${errors} en erreur.` : `Import terminé : ${n} feuille(s) importée(s).`;
+  toast("Import terminé.");
+}
+
+/* ---------- divers ---------- */
+let toastT;
+function toast(m){ const t=$("#toast"); t.textContent=m; t.hidden=false; clearTimeout(toastT); toastT=setTimeout(()=>t.hidden=true, 3000); }
+function saveError(e){
+  const c=e&&e.code;
+  if(c==="permission-denied") toast("Accès refusé : cet email n'est pas autorisé dans les règles Firestore.");
+  else if(c==="resource-exhausted") toast("Limite gratuite atteinte pour aujourd'hui. Réessaie demain.");
+  else toast("Enregistrement impossible. Vérifie ta connexion et réessaie.");
+  console.error(e);
+}
+function setTab(t){
+  S.tab=t;
+  document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-selected", String(b.dataset.tab===t)));
+  $("#tab-liste").hidden = t!=="liste"; $("#tab-bilan").hidden = t!=="bilan"; $("#fab").hidden = t!=="liste";
+  if(t==="bilan") renderBilan();
+}
+
+/* ---------- connexion ---------- */
+function authMsg(e){
+  const c=(e&&e.code)||"";
+  if(c.includes("invalid-credential")||c.includes("wrong-password")||c.includes("user-not-found")||c.includes("invalid-login")) return "Email ou mot de passe incorrect.";
+  if(c.includes("invalid-email")) return "Adresse email invalide.";
+  if(c.includes("too-many-requests")) return "Trop d'essais. Patiente quelques minutes.";
+  if(c.includes("network")) return "Pas de connexion internet.";
+  if(c.includes("api-key")) return "Configuration Firebase invalide : vérifie la clé apiKey dans config.js.";
+  return "Connexion impossible ("+c+").";
+}
+async function login(){
+  const email=$("#lgEmail").value.trim(), pass=$("#lgPass").value;
+  $("#lgErr").textContent="";
+  if(!email||!pass){ $("#lgErr").textContent="Saisis ton email et ton mot de passe."; return; }
+  $("#lgGo").disabled=true;
+  try{ await signInWithEmailAndPassword(auth, email, pass); }
+  catch(e){ $("#lgErr").textContent=authMsg(e); }
+  $("#lgGo").disabled=false;
+}
+$("#lgGo").addEventListener("click", login);
+$("#lgPass").addEventListener("keydown", e=>{ if(e.key==="Enter") login(); });
+$("#lgReset").addEventListener("click", async ()=>{
+  const email=$("#lgEmail").value.trim();
+  if(!email){ $("#lgErr").textContent="Saisis d'abord ton email ci-dessus."; return; }
+  try{ await sendPasswordResetEmail(auth, email); $("#lgErr").textContent=""; toast("Email de réinitialisation envoyé (vérifie les spams)."); }
+  catch(e){ $("#lgErr").textContent=authMsg(e); }
+});
+
+function startData(){
+  S.unsub.push(onSnapshot(collection(db,"feuilles"), snap=>{
+    S.feuilles = snap.docs.map(d=>Object.assign({id:d.id}, d.data()));
+    S.ready=true; $("#banner").hidden=true; renderAll();
+  }, err=>{
+    const b=$("#banner"); b.hidden=false;
+    b.textContent = err.code==="permission-denied" ? "Accès refusé : ton email n'est pas autorisé dans les règles Firestore." : "La synchronisation s'est arrêtée. Recharge l'application.";
+  }));
+  S.unsub.push(onSnapshot(doc(db,"reglages","general"), s=>{ if(s.exists()){ S.settings=Object.assign({delai:45,devise:"XPF"}, s.data()); renderAll(); } }, ()=>{}));
+}
+function stopData(){ S.unsub.forEach(u=>u()); S.unsub=[]; S.feuilles=[]; S.ready=false; }
+
+onAuthStateChanged(auth, user=>{
+  $("#splash").hidden=true;
+  S.user=user;
+  if(user){ $("#login").hidden=true; $("#lgPass").value=""; startData(); renderAll(); }
+  else { stopData(); closeDetail(); if(S.form) closeForm(false); setTab("liste"); $("#login").hidden=false; }
+});
+
+/* ---------- événements ---------- */
+document.addEventListener("click", e=>{
+  const t=e.target.closest("button"); if(!t) return;
+  if(t.dataset.tab) return setTab(t.dataset.tab);
+  if(t.dataset.st){ S.filter.st=t.dataset.st; return renderAll(); }
+  if(t.dataset.sum){ S.filter.st=t.dataset.sum; setTab("liste"); return renderAll(); }
+  if(t.dataset.open) return openDetail(t.dataset.open);
+  if(t.dataset.act) return detailAction(t.dataset.act);
+  if(t.dataset.view!=null && t.dataset.src){ $("#viewerImg").src=t.dataset.src; $("#viewer").classList.remove("zoom"); $("#viewer").hidden=false; return; }
+  if(t.dataset.b && S.form){ S.form.beneficiaire=t.dataset.b; return renderFormSegs(); }
+  if(t.dataset.o && S.form){ S.form.organisme=t.dataset.o; return renderFormSegs(); }
+  if(t.dataset.v && S.form){ S.form.statut=t.dataset.v; return renderFormSegs(); }
+  if(t.dataset.rm!=null && S.form){ const sc=S.form.scans.splice(Number(t.dataset.rm),1)[0]; const ai=S.form._added.indexOf(sc); if(ai>=0){ S.form._added.splice(ai,1); Store.deleteScan(sc); } else S.form._removed.push(sc); return renderFormPhotos(); }
+  switch(t.id){
+    case "fab": return openForm(null);
+    case "formClose": return closeForm(true);
+    case "formSave": return saveForm();
+    case "detailClose": return closeDetail();
+    case "detailEdit": { const f=S.feuilles.find(x=>x.id===S.openId); if(f) openForm(f); return; }
+    case "viewerClose": $("#viewer").hidden=true; return;
+    case "btnExport": if(!S.feuilles.length){ toast("Aucune feuille à exporter."); return; } download("feuilles-de-soins-"+todayISO()+".csv", buildCSV(), "text/csv;charset=utf-8"); return;
+    case "btnBackup": return doBackup();
+    case "btnLogout": if(confirm("Se déconnecter de l'application ?")) signOut(auth); return;
+    case "btnSettings": {
+      const d=parseInt($("#sDelai").value,10); if(!(d>0)){ toast("Indique un nombre de jours."); return; }
+      const st={delai:d, devise:$("#sDev").value}; S.settings=st;
+      Store.saveSettings(st).then(()=>{ renderAll(); toast("Réglages enregistrés."); }); return;
+    }
+  }
+});
+$("#viewerImg").addEventListener("click", ()=>$("#viewer").classList.toggle("zoom"));
+$("#fBenef").addEventListener("change", e=>{ S.filter.benef=e.target.value; renderList(); });
+$("#fOrg").addEventListener("change", e=>{ S.filter.org=e.target.value; renderList(); });
+document.addEventListener("change", e=>{
+  const t=e.target;
+  if(t.dataset && t.dataset.file){ const fl=[...(t.files||[])]; if(fl.length) addFiles(fl); return; }
+  if(t.dataset && t.dataset.import){ const f=t.files&&t.files[0]; if(f) doImport(f); t.value=""; return; }
+  if(t.id==="bYear"){ S.bilanYear=t.value; renderBilan(); }
+});
+
+renderAll();
+
+/* ---------- appli installable ---------- */
+if("serviceWorker" in navigator){ window.addEventListener("load", ()=>navigator.serviceWorker.register("sw.js").catch(()=>{})); }
+</script>
+
+</body>
+</html>
