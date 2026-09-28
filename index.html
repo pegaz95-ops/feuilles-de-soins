@@ -323,7 +323,9 @@ const STATUS = {
   todo:{label:"À envoyer", cls:"todo"}, sent:{label:"Envoyée", cls:"sent"},
   late:{label:"À relancer", cls:"late"}, paid:{label:"Remboursée", cls:"paid"}
 };
-const S = { user:null, foyers:[], invites:[], foyerId:null, foyer:null, ready:false, feuilles:[], settings:{delai:45, devise:"XPF"},
+/* Stockage : limite par espace (environ 2 ans de feuilles pour une famille). */
+const QUOTA = 100*1024*1024, QUOTA_WARN = 0.8;
+const S = { archived:{}, user:null, foyers:[], invites:[], foyerId:null, foyer:null, ready:false, feuilles:[], settings:{delai:45, devise:"XPF"},
   filter:{st:"attente", benef:"", org:""}, tab:"liste", openId:null, form:null, unsubRoot:[], unsubFoyer:[], signup:false };
 const $ = s => document.querySelector(s);
 const esc = s => String(s==null?"":s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -380,7 +382,7 @@ const Store = {
     const t = makeThumb(img);
     const id = uid(); scanCache[id] = dataUrl;
     await write(setDoc(fdoc("scans",id), {img:dataUrl, createdAt:new Date().toISOString()}));
-    return {d:id, t};
+    return {d:id, t, s:dataUrl.length};
   },
   deleteScan(sc){ if(sc && sc.d) deleteDoc(fdoc("scans",sc.d)).catch(()=>{}); }
 };
@@ -414,15 +416,120 @@ function fitToLimit(img, limit){
 function makeThumb(img){ return drawTo(img,240).toDataURL("image/jpeg",.6); }
 const thumbBusy = new Set();
 async function ensureThumbs(f, all){
-  const idx=(f.scans||[]).map((sc,i)=>i).filter(i=>!f.scans[i].t && (all||i===0));
+  const idx=(f.scans||[]).map((sc,i)=>i).filter(i=>{ const x=f.scans[i]; return all ? (!x.t||!x.s) : (i===0 && !x.t); });
   if(!idx.length || thumbBusy.has(f.id)) return;
   thumbBusy.add(f.id);
   try{
     const scans=f.scans.map(x=>Object.assign({},x));
-    for(const i of idx){ const u=await scanURL(scans[i]).catch(()=>null); if(u) scans[i].t=makeThumb(await loadSrc(u)); }
-    if(scans.some((x,i)=>x.t && !f.scans[i].t)) await updateDoc(fdoc("feuilles",f.id), {scans});
+    for(const i of idx){ const u=await scanURL(scans[i]).catch(()=>null); if(u){ if(!scans[i].t) scans[i].t=makeThumb(await loadSrc(u)); if(!scans[i].s) scans[i].s=u.length; } }
+    if(scans.some((x,i)=>(x.t && !f.scans[i].t)||(x.s && !f.scans[i].s))) await updateDoc(fdoc("feuilles",f.id), {scans});
   }catch(e){ console.warn(e); }
   finally{ thumbBusy.delete(f.id); }
+}
+/* ---------- stockage ---------- */
+const scanBytes = sc => (sc.s || 330000) + (sc.t ? sc.t.length : 0);
+const feuilleBytes = f => 1500 + (f.scans||[]).reduce((a,sc)=>a+scanBytes(sc),0);
+const usage = (list=S.feuilles) => list.reduce((a,f)=>a+feuilleBytes(f),0);
+const fmtMo = b => (b/1048576).toLocaleString("fr-FR",{maximumFractionDigits:1})+" Mo";
+const yearOf = f => (f.dateSoins||"").slice(0,4) || "Sans date";
+let metaRunning=false;
+async function completeSizes(){
+  if(metaRunning) return; metaRunning=true;
+  try{ for(const f of S.feuilles.slice()){ if((f.scans||[]).some(sc=>!sc.s||!sc.t)) await ensureThumbs(f,true); } }
+  finally{ metaRunning=false; }
+}
+function loadZipLib(){
+  if(window.JSZip) return Promise.resolve();
+  return new Promise((res,rej)=>{ const sc=document.createElement("script"); sc.src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"; sc.onload=res; sc.onerror=()=>rej(new Error("zip")); document.head.appendChild(sc); });
+}
+const safeName = s => String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^A-Za-z0-9 _-]/g,"").trim().replace(/\s+/g,"_").slice(0,40) || "sans-nom";
+async function buildArchive(year, progress){
+  await loadZipLib();
+  const list=S.feuilles.filter(f=>yearOf(f)===year).sort((a,b)=>(a.dateSoins||"").localeCompare(b.dateSoins||""));
+  const zip=new window.JSZip();
+  const data={format:"feuilles-de-soins-dubois",version:3,annee:year,espace:S.foyer.nom,settings:S.settings,beneficiaires:B(),organismes:O(),feuilles:[],fichiers:{}};
+  zip.file(`recapitulatif-${year}.csv`, buildCSV(list));
+  let done=0, missing=0; const total=list.reduce((a,f)=>a+(f.scans||[]).length,0);
+  for(const f of list){
+    data.feuilles.push(JSON.parse(JSON.stringify(f)));
+    for(let i=0;i<(f.scans||[]).length;i++){
+      const sc=f.scans[i]; const u=await scanURL(sc).catch(()=>null);
+      if(u){
+        const path=`photos/${safeName(f.beneficiaire)}/${f.dateSoins||"sans-date"}_${safeName(f.praticien||f.organisme)}_${f.id.slice(-4)}_${i+1}.jpg`;
+        zip.file(path, u.split(",")[1], {base64:true}); data.fichiers[sc.d]=path;
+      } else missing++;
+      done++; progress && progress(`Préparation des photos… ${done}/${total}`);
+    }
+  }
+  zip.file("donnees-application.json", JSON.stringify(data));
+  zip.file("LISEZ-MOI.txt", `Archive des feuilles de soins ${year} – ${S.foyer.nom}\r\n\r\n- recapitulatif-${year}.csv : la liste des feuilles (s'ouvre avec Excel).\r\n- photos/ : les photos, classées par bénéficiaire.\r\n- donnees-application.json : pour réimporter cette année dans l'application (Bilan > Importer une sauvegarde, en choisissant ce fichier ZIP).\r\n\r\nConservez cette archive en lieu sûr (Google Drive, ordinateur…) : elle contient des données de santé.\r\n`);
+  progress && progress("Compression…");
+  const blob = await zip.generateAsync({type:"blob", compression:"STORE"});
+  return {blob, count:list.length, missing};
+}
+async function archiveYear(){
+  const year=$("#arYear").value, box=$("#arResult"), btn=$("#btnArchive");
+  if(!navigator.onLine){ toast("Il faut une connexion internet pour préparer l'archive."); return; }
+  btn.disabled=true; box.innerHTML=`<p class="note">Préparation…</p>`;
+  try{
+    const r=await buildArchive(year, m=>{ box.innerHTML=`<p class="note">${esc(m)}</p>`; });
+    const name=`feuilles-de-soins-${safeName(S.foyer.nom)}-${year}.zip`;
+    const url=URL.createObjectURL(r.blob);
+    const canShare = !!(navigator.canShare && navigator.canShare({files:[new File([r.blob], name, {type:"application/zip"})]}));
+    S.lastArchive={blob:r.blob, name, year};
+    box.innerHTML = `<p class="note">Archive ${year} prête : ${r.count} feuille(s), ${fmtMo(r.blob.size)}.${r.missing?` ${r.missing} photo(s) introuvable(s).`:""}</p>
+      <div class="actions" style="margin-top:8px"><a class="btn block" href="${url}" download="${name}" data-archive="${year}">Enregistrer sur l'appareil</a>
+      ${canShare?`<button class="btn ghost block" id="btnShareZip" type="button">Envoyer vers Drive, mail…</button>`:""}</div>`;
+  }catch(e){ console.error(e); box.innerHTML=`<p class="note">Impossible de préparer l'archive. Vérifie ta connexion et réessaie.</p>`; }
+  btn.disabled=false;
+}
+function markArchived(year){ S.archived[year]=true; const b=$("#btnDelYear"); if(b && $("#arYear").value===year) b.disabled=false; const c=$("#arHave"); if(c && $("#arYear").value===year) c.checked=true; }
+async function deleteYear(){
+  const year=$("#arYear").value, keep=$("#arKeep").checked;
+  const list=S.feuilles.filter(f=>yearOf(f)===year && !(keep && f.statut!=="remboursee"));
+  if(!list.length){ toast("Aucune feuille à supprimer pour "+year+"."); return; }
+  const typed=prompt(`Suppression DÉFINITIVE de ${list.length} feuille(s) de ${year} et de leurs photos (${fmtMo(usage(list))}).\n\nPour confirmer, tape l'année : ${year}`);
+  if((typed||"").trim()!==year){ toast("Suppression annulée."); return; }
+  const btn=$("#btnDelYear"); btn.disabled=true;
+  let n=0, err=0;
+  for(const f of list){
+    try{ for(const sc of (f.scans||[])) if(sc.d) await deleteDoc(fdoc("scans",sc.d)); await deleteDoc(fdoc("feuilles",f.id)); n++; }
+    catch(e){ err++; console.error(e); }
+    btn.textContent=`Suppression… ${n}/${list.length}`;
+  }
+  toast(err ? `${n} feuille(s) supprimée(s), ${err} en erreur.` : `${n} feuille(s) de ${year} supprimée(s) de l'espace en ligne.`);
+  delete S.archived[year];
+}
+function renderStorage(){
+  const used=usage(), pct=Math.min(100, Math.round(used/QUOTA*100));
+  const approx=S.feuilles.some(f=>(f.scans||[]).some(sc=>!sc.s));
+  const years={};
+  S.feuilles.forEach(f=>{ const y=yearOf(f); years[y]=years[y]||{n:0,p:0,b:0,pend:0}; years[y].n++; years[y].p+=(f.scans||[]).length; years[y].b+=feuilleBytes(f); if(f.statut!=="remboursee") years[y].pend++; });
+  const ys=Object.keys(years).sort().reverse();
+  const cur = S.arYear && years[S.arYear] ? S.arYear : (ys.length>1 ? ys[ys.length-1] : ys[0]);
+  const admin=isAdmin(), arch=!!S.archived[cur];
+  const col = pct>=100 ? "var(--late)" : pct>=QUOTA_WARN*100 ? "var(--todo)" : "var(--paid)";
+  return `
+    <h2 class="sec">Stockage</h2>
+    <div class="card-box">
+      <div style="height:14px;border-radius:7px;background:var(--rule);overflow:hidden"><div style="height:100%;width:${pct}%;background:${col}"></div></div>
+      <p style="margin:8px 0 0"><b>${approx?"≈ ":""}${fmtMo(used)}</b> utilisés sur ${fmtMo(QUOTA)} (${pct} %)</p>
+      ${pct>=100?`<p class="note" style="color:var(--late)">Espace plein : archive puis supprime une ancienne année pour pouvoir ajouter des photos.</p>`:pct>=QUOTA_WARN*100?`<p class="note" style="color:var(--todo)">L'espace sera bientôt plein. Pense à archiver l'année la plus ancienne.</p>`:""}
+      ${ys.length?`<div class="tablewrap" style="margin-top:10px"><table style="min-width:0"><thead><tr><th>Année</th><th>Feuilles</th><th>Photos</th><th>Taille</th></tr></thead><tbody>
+        ${ys.map(y=>`<tr><td>${esc(y)}</td><td>${years[y].n}</td><td>${years[y].p}</td><td>${fmtMo(years[y].b)}</td></tr>`).join("")}</tbody></table></div>`:`<p class="note">Aucune feuille enregistrée.</p>`}
+      ${ys.length?`
+      <label class="lbl" for="arYear">Archiver une année</label>
+      <select class="inp" id="arYear">${ys.map(y=>`<option ${y===cur?"selected":""}>${esc(y)}</option>`).join("")}</select>
+      <p class="note">L'archive ZIP contient les photos classées par bénéficiaire, un récapitulatif pour Excel, et un fichier pour réimporter l'année plus tard.</p>
+      <div class="actions" style="margin-top:8px"><button class="btn block" id="btnArchive" type="button">Télécharger l'année ${esc(cur)} (ZIP)</button></div>
+      <div id="arResult"></div>
+      ${admin?`<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--rule)">
+        <strong>Libérer de l'espace</strong>
+        <label style="display:flex;gap:8px;align-items:flex-start;margin-top:8px"><input type="checkbox" id="arKeep" checked> Conserver les feuilles de ${esc(cur)} pas encore remboursées (${years[cur]?years[cur].pend:0})</label>
+        <label style="display:flex;gap:8px;align-items:flex-start;margin-top:8px"><input type="checkbox" id="arHave" ${arch?"checked":""}> J'ai bien enregistré l'archive de ${esc(cur)}</label>
+        <div class="actions" style="margin-top:8px"><button class="btn danger block" id="btnDelYear" type="button" ${arch?"":"disabled"}>Supprimer ${esc(cur)} de l'espace en ligne</button></div>
+      </div>`:`<p class="note">Seul un administrateur peut supprimer une année de l'espace en ligne.</p>`}`:""}
+    </div>`;
 }
 function openViewer(sc){
   const img=$("#viewerImg"), hint=$("#viewer .vhint");
@@ -471,11 +578,13 @@ function renderList(){
   const el=$("#list");
   if(!S.ready){ el.innerHTML=`<div class="empty">Chargement des feuilles…</div>`; return; }
   const v=visible();
+  const pctU=usage()/QUOTA;
+  const qn = pctU>=QUOTA_WARN ? `<button class="banner" data-tab="params" style="display:block;width:100%;text-align:left;margin:0 0 10px">${pctU>=1?"Espace de stockage plein":"Espace de stockage bientôt plein"} (${Math.round(pctU*100)} %) : touche ici pour archiver une ancienne année.</button>` : "";
   if(!v.length){
-    el.innerHTML = `<div class="empty">${S.feuilles.length ? `<strong>Aucune feuille dans ce filtre</strong>Change de filtre ou scanne une nouvelle feuille.` : `<strong>Aucune feuille pour l'instant</strong>Touche « Scanner une feuille » pour photographier la première.`}</div>`;
+    el.innerHTML = qn + `<div class="empty">${S.feuilles.length ? `<strong>Aucune feuille dans ce filtre</strong>Change de filtre ou scanne une nouvelle feuille.` : `<strong>Aucune feuille pour l'instant</strong>Touche « Scanner une feuille » pour photographier la première.`}</div>`;
     return;
   }
-  el.innerHTML = v.map(f=>{
+  el.innerHTML = qn + v.map(f=>{
     const st=status(f), S2=STATUS[st];
     let when="";
     if(st==="todo") when=`Soins du ${fmtDate(f.dateSoins)}`;
@@ -520,8 +629,8 @@ function renderBilan(){
     <div class="actions" style="margin-top:8px">
       <button class="btn ghost block" id="btnExport" type="button">Exporter la liste (CSV pour Excel)</button>
       <button class="btn ghost block" id="btnBackup" type="button">Sauvegarde complète avec photos (.json)</button>
-      <label class="btn ghost block" style="position:relative;overflow:hidden">Importer une sauvegarde (.json)
-        <input type="file" accept="application/json,.json" data-import="1" style="position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer"></label>
+      <label class="btn ghost block" style="position:relative;overflow:hidden">Importer une sauvegarde ou une archive (.json, .zip)
+        <input type="file" accept="application/json,.json,application/zip,.zip" data-import="1" style="position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer"></label>
     </div>
     <p class="hint" id="impStatus"></p>`;
 }
@@ -535,6 +644,7 @@ function listEditor(kind, items, admin){
 }
 function renderParams(){
   const f=S.foyer; if(!f) return;
+  if(!S.sizesTried && S.feuilles.some(x=>(x.scans||[]).some(sc=>!sc.s))){ S.sizesTried=true; completeSizes().then(()=>{ if(S.tab==="params") renderParams(); }); }
   const admin=isAdmin();
   const membres=f.membres||{};
   const people=(f.members||[]).map(u=>{
@@ -588,6 +698,8 @@ function renderParams(){
       <div class="actions"><button class="btn block" id="btnAddPerson" type="button">Créer l'accès</button></div>
       <p class="note">Pour changer l'email d'une personne : retire son accès, puis recrée-le avec le nouvel email.</p>
     </div>`:""}
+
+    ${renderStorage()}
 
     <h2 class="sec">Mon compte</h2>
     <div class="card-box">
@@ -696,6 +808,7 @@ function renderFormPhotos(){
 }
 async function addFiles(files){
   const F=S.form; if(!F) return;
+  if(usage() >= QUOTA){ toast("Espace de stockage plein : archive une ancienne année (Paramètres → Stockage)."); return; }
   for(const file of files){
     if(!file.type.startsWith("image/")){ toast("Seules les photos sont acceptées."); continue; }
     F._busy++; renderFormPhotos();
@@ -734,11 +847,11 @@ function download(name, text, type){
   const a=document.createElement("a"); a.href=u; a.download=name; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(()=>URL.revokeObjectURL(u), 4000);
 }
-function buildCSV(){
+function buildCSV(list=S.feuilles){
   const head=["Bénéficiaire","Organisme","Date des soins","Praticien ou soin","Montant payé","Statut","Date d'envoi","Jours depuis l'envoi","Date du remboursement","Montant remboursé","Notes","Devise"];
   const q=v=>{ const s=String(v==null?"":v); return /[;"\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
   const num=v=> v===""||v==null ? "" : String(v).replace(".",",");
-  const rows=S.feuilles.slice().sort((a,b)=>(a.dateSoins||"").localeCompare(b.dateSoins||"")).map(f=>[
+  const rows=list.slice().sort((a,b)=>(a.dateSoins||"").localeCompare(b.dateSoins||"")).map(f=>[
     f.beneficiaire,f.organisme,fmtDate(f.dateSoins),f.praticien,num(f.montant),STATUS[status(f)].label,
     f.statut!=="a_envoyer"?fmtDate(f.dateEnvoi):"", f.statut==="envoyee"?daysSince(f.dateEnvoi):"",
     f.statut==="remboursee"?fmtDate(f.dateRemb):"", f.statut==="remboursee"?num(f.montantRemb):"", f.notes, S.settings.devise]);
@@ -757,7 +870,16 @@ async function doBackup(){
 async function doImport(file){
   const st=$("#impStatus");
   let data;
-  try{ data=JSON.parse(await file.text()); }catch(e){ st.textContent="Ce fichier n'est pas une sauvegarde valide."; return; }
+  try{
+    if(/\.zip$/i.test(file.name) || /zip/.test(file.type)){
+      st.textContent="Lecture de l'archive…";
+      await loadZipLib();
+      const zip=await window.JSZip.loadAsync(file);
+      const jf=zip.file("donnees-application.json"); if(!jf) throw new Error("json");
+      data=JSON.parse(await jf.async("string")); data.scans={};
+      for(const [id,path] of Object.entries(data.fichiers||{})){ const zf=zip.file(path); if(zf) data.scans[id]="data:image/jpeg;base64,"+await zf.async("base64"); }
+    } else data=JSON.parse(await file.text());
+  }catch(e){ st.textContent="Ce fichier n'est pas une sauvegarde ou une archive valide."; return; }
   if(!data || data.format!=="feuilles-de-soins-dubois" || !Array.isArray(data.feuilles)){ st.textContent="Ce fichier n'est pas une sauvegarde de cette application."; return; }
   if(!confirm(`Importer ${data.feuilles.length} feuille(s) dans l'espace « ${S.foyer.nom} » ?`)) return;
   if(isAdmin()){
@@ -1004,6 +1126,7 @@ onAuthStateChanged(auth, user=>{
 
 /* ---------- événements ---------- */
 document.addEventListener("click", async e=>{
+  const a=e.target.closest("a[data-archive]"); if(a){ markArchived(a.dataset.archive); return; }
   const t=e.target.closest("button"); if(!t) return;
   const d=t.dataset;
   if(d.tab) return setTab(d.tab);
@@ -1044,6 +1167,10 @@ document.addEventListener("click", async e=>{
     case "btnMyName": { const v=$("#myName").value.trim(); if(!v) return; updateProfile(S.user,{displayName:v}).catch(()=>{});
       return adminDo(updateDoc(foyerRef(), {["membres."+S.user.uid+".nom"]:v}).catch(e=>{ if(e.code==="permission-denied") return; throw e; }), "Nom modifié."); }
     case "btnPw": return changePassword();
+    case "btnArchive": return archiveYear();
+    case "btnShareZip": { const a=S.lastArchive; if(!a) return;
+      try{ await navigator.share({files:[new File([a.blob], a.name, {type:"application/zip"})], title:a.name}); markArchived(a.year); }catch(e){} return; }
+    case "btnDelYear": return deleteYear();
     case "btnAddPerson": return addPerson();
     case "btnNewFoyer": return showOnboard(true);
     case "obCancel": $("#onboard").hidden=true; return;
@@ -1069,6 +1196,8 @@ document.addEventListener("change", e=>{
   if(t.dataset && t.dataset.file){ const fl=[...(t.files||[])]; if(fl.length) addFiles(fl); return; }
   if(t.dataset && t.dataset.import){ const f=t.files&&t.files[0]; if(f) doImport(f); t.value=""; return; }
   if(t.id==="bYear"){ S.bilanYear=t.value; renderBilan(); }
+  if(t.id==="arYear"){ S.arYear=t.value; renderParams(); }
+  if(t.id==="arHave"){ const b=$("#btnDelYear"); if(b) b.disabled=!t.checked; }
   if(t.id==="selFoyer"){ localStorage.setItem("fds-foyer", t.value); chooseFoyer(); renderParams(); }
 });
 
