@@ -92,6 +92,7 @@ nav.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(-
 /* bouton principal */
 .fab{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:5;display:flex;align-items:center;gap:10px;background:var(--ink);color:var(--sheet);border:0;border-radius:999px;padding:14px 22px;font-family:var(--head);font-weight:700;font-size:18px;box-shadow:0 6px 18px rgba(0,0,0,.25)}
 .fab svg{width:22px;height:22px}
+.fab[hidden]{display:none!important}
 
 /* feuille modale */
 .sheet{position:fixed;inset:0;z-index:10;background:var(--paper);overflow-y:auto;-webkit-overflow-scrolling:touch;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -338,6 +339,7 @@ let app, auth, db;
 try{
   app = initializeApp(window.FIREBASE_CONFIG);
   auth = getAuth(app);
+  auth.languageCode = "fr";
   try{ db = initializeFirestore(app, {localCache: persistentLocalCache({tabManager: persistentMultipleTabManager()})}); }
   catch(e){ db = initializeFirestore(app, {}); }
 }catch(e){ $("#splash").textContent = "Configuration Firebase introuvable ou invalide (fichier config.js)."; throw e; }
@@ -692,10 +694,11 @@ function renderParams(){
       <strong>Ajouter une personne</strong>
       <label class="lbl" for="npNom">Nom</label><input type="text" id="npNom" placeholder="Prénom Nom">
       <label class="lbl" for="npEmail">Email (identifiant)</label><input type="email" id="npEmail" autocapitalize="off" spellcheck="false">
-      <label class="lbl" for="npPass">Mot de passe provisoire</label><input type="text" id="npPass" autocomplete="off" placeholder="6 caractères minimum">
-      <p class="note">Laisse le mot de passe vide pour envoyer seulement une invitation : la personne créera son compte elle-même avec cet email. Si l'email a déjà un compte, elle recevra une invitation dans ses Paramètres.</p>
+      <label class="lbl" for="npPass">Mot de passe provisoire</label><input type="text" id="npPass" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="6 caractères minimum (facultatif)">
+      <p class="note">Sans mot de passe, la personne reçoit un <b>email</b> pour choisir elle-même le sien (pense à lui dire de vérifier ses spams). Avec un mot de passe provisoire, transmets-le-lui avec le bouton d'envoi qui apparaîtra après la création. Si l'email a déjà un compte, la personne trouvera l'invitation dans ses Paramètres.</p>
       <label style="display:flex;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" id="npAdmin"> Administrateur (peut gérer l'espace et les accès)</label>
       <div class="actions"><button class="btn block" id="btnAddPerson" type="button">Créer l'accès</button></div>
+      <div id="npResult"></div>
       <p class="note">Pour changer l'email d'une personne : retire son accès, puis recrée-le avec le nouvel email.</p>
     </div>`:""}
 
@@ -933,38 +936,56 @@ async function addItem(kind){
   await adminDo(updateDoc(foyerRef(), {[key]:list}), "Ajouté.");
 }
 async function addPerson(){
-  const nom=$("#npNom").value.trim(), email=low($("#npEmail").value), pass=$("#npPass").value, admin=$("#npAdmin").checked;
-  if(!email || !email.includes("@")){ toast("Indique un email valide."); return; }
+  const nom=$("#npNom").value.trim(), email=low($("#npEmail").value), typed=$("#npPass").value.trim(), admin=$("#npAdmin").checked;
+  if(!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ toast("Indique un email valide."); return; }
   const membres=S.foyer.membres||{};
   if(Object.values(membres).some(m=>low(m.email)===email)){ toast("Cette personne a déjà accès."); return; }
-  if(pass && pass.length<6){ toast("Mot de passe : 6 caractères minimum."); return; }
+  if(typed && typed.length<6){ toast("Mot de passe : 6 caractères minimum."); return; }
+  const pass = typed || (crypto.getRandomValues(new Uint32Array(4)).join("").slice(0,16)+"Aa!");
   const btn=$("#btnAddPerson"); btn.disabled=true; btn.textContent="Création…";
-  let newUid=null;
+  let newUid=null, existed=false;
   try{
-    if(pass){
-      const sec=initializeApp(window.FIREBASE_CONFIG, "creation-"+Date.now());
-      const sa=getAuth(sec);
-      try{ const c=await createUserWithEmailAndPassword(sa, email, pass); if(nom) await updateProfile(c.user,{displayName:nom}).catch(()=>{}); newUid=c.user.uid; }
-      catch(e){ if(!(e.code||"").includes("email-already-in-use")) throw e; }
-      finally{ await signOut(sa).catch(()=>{}); await deleteApp(sec).catch(()=>{}); }
-    }
+    const sec=initializeApp(window.FIREBASE_CONFIG, "creation-"+Date.now());
+    const sa=getAuth(sec);
+    try{ const c=await createUserWithEmailAndPassword(sa, email, pass); if(nom) await updateProfile(c.user,{displayName:nom}).catch(()=>{}); newUid=c.user.uid; }
+    catch(e){ if((e.code||"").includes("email-already-in-use")) existed=true; else throw e; }
+    finally{ await signOut(sa).catch(()=>{}); await deleteApp(sec).catch(()=>{}); }
+    let mode;
     if(newUid){
       const up={members:arrayUnion(newUid), ["membres."+newUid]:{nom:nom||email, email, ajouteLe:new Date().toISOString()}};
       if(admin) up.admins=arrayUnion(newUid);
       await updateDoc(foyerRef(), up);
-      toast("Accès créé. Transmets l'email et le mot de passe provisoire à la personne.");
+      if(!typed){ await sendPasswordResetEmail(auth, email); mode="mail"; } else mode="pass";
     } else {
       await updateDoc(foyerRef(), {invites:arrayUnion(email), ["inviteNoms."+ekey(email)]:nom||email});
-      toast(pass ? "Cet email a déjà un compte : une invitation lui a été envoyée dans l'application." : "Invitation créée : la personne doit créer son compte avec cet email.");
+      mode="invite";
     }
-    ["#npNom","#npEmail","#npPass"].forEach(s=>$(s).value=""); $("#npAdmin").checked=false;
+    showShare(nom, email, typed, mode);
+    ["#npNom","#npEmail","#npPass"].forEach(x=>$(x).value=""); $("#npAdmin").checked=false;
   }catch(e){
     const c=e.code||"";
     if(c.includes("weak-password")) toast("Mot de passe trop faible (6 caractères minimum).");
     else if(c.includes("invalid-email")) toast("Adresse email invalide.");
+    else if(c.includes("operation-not-allowed")) toast("La création de comptes est désactivée dans Firebase (Authentication).");
     else saveError(e);
   }
   btn.disabled=false; btn.textContent="Créer l'accès";
+}
+function showShare(nom, email, pass, mode){
+  const url=location.origin+location.pathname;
+  const hi="Bonjour"+(nom?" "+nom.split(" ")[0]:"")+",\n\n";
+  let msg;
+  if(mode==="pass") msg=hi+`Je t'ai donné accès à l'espace « ${S.foyer.nom} » dans l'application Feuilles de soins :\n${url}\n\nIdentifiant : ${email}\nMot de passe provisoire : ${pass}\n\nPense à le changer dans Paramètres → Mon compte.`;
+  else if(mode==="mail") msg=hi+`Je t'ai donné accès à l'espace « ${S.foyer.nom} » dans l'application Feuilles de soins :\n${url}\n\nTu vas recevoir un email pour choisir ton mot de passe (regarde aussi dans les spams). Ton identifiant est : ${email}`;
+  else msg=hi+`Je t'ai invité(e) dans l'espace « ${S.foyer.nom} » de l'application Feuilles de soins :\n${url}\n\nConnecte-toi avec ton compte (${email}), puis va dans Paramètres et touche « Rejoindre cet espace ».`;
+  S.shareMsg=msg;
+  const info = mode==="mail" ? "Accès créé. Un email a été envoyé à "+email+" pour choisir son mot de passe." :
+               mode==="pass" ? "Accès créé. Transmets l'identifiant et le mot de passe provisoire :" :
+               "Cet email a déjà un compte : l'invitation l'attend dans ses Paramètres. Préviens la personne :";
+  $("#npResult").innerHTML=`<div class="card-box" style="margin-top:10px"><p class="note" style="margin-top:0">${esc(info)}</p>
+    <textarea readonly style="min-height:130px;font-size:14px">${esc(msg)}</textarea>
+    <div class="actions" style="margin-top:8px"><button class="btn block" id="btnShareInvite" type="button">Envoyer par SMS, WhatsApp, mail…</button>
+    <button class="btn ghost block" id="btnCopyInvite" type="button">Copier le message</button></div></div>`;
 }
 async function acceptInvite(fid){
   const f=S.invites.find(x=>x.id===fid); if(!f) return;
@@ -1172,6 +1193,8 @@ document.addEventListener("click", async e=>{
       try{ await navigator.share({files:[new File([a.blob], a.name, {type:"application/zip"})], title:a.name}); markArchived(a.year); }catch(e){} return; }
     case "btnDelYear": return deleteYear();
     case "btnAddPerson": return addPerson();
+    case "btnShareInvite": { if(navigator.share){ try{ await navigator.share({text:S.shareMsg}); }catch(e){} } else { try{ await navigator.clipboard.writeText(S.shareMsg); toast("Message copié."); }catch(e){ toast("Copie impossible : sélectionne le texte."); } } return; }
+    case "btnCopyInvite": { try{ await navigator.clipboard.writeText(S.shareMsg); toast("Message copié."); }catch(e){ toast("Copie impossible : sélectionne le texte."); } return; }
     case "btnNewFoyer": return showOnboard(true);
     case "obCancel": $("#onboard").hidden=true; return;
     case "obGo": {
